@@ -1,8 +1,12 @@
 package com.dps.roboleague;
 
-public class Main {
+import com.dps.roboleague.demo.DemoScenario;
+import com.dps.roboleague.infrastructure.config.RoboLeagueModule;
+import java.time.Clock;
+
+public final class Main {
 
     public static void main(String[] args) {
-        System.out.println("DPS-roboleague");
+        new DemoScenario(RoboLeagueModule.inMemory(Clock.systemUTC())).run();
     }
 }
