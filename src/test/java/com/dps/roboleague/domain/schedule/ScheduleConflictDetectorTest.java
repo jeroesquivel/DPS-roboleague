@@ -33,25 +33,25 @@ class ScheduleConflictDetectorTest {
     void detectsThatTheArenaIsAlreadyTaken() {
         Heat candidate = heat("HEAT-2", "TEAM-2", "A1", TEN.plusMinutes(5), Set.of(JudgeId.of("J2")));
 
-        assertEquals(List.of(ScheduleConflictDetector.ARENA_BUSY), codesOf(candidate));
+        assertEquals(List.of(ScheduleConflictType.ARENA_BUSY), typesOf(candidate));
     }
 
     @Test
     void detectsThatTheTeamIsAlreadyRunning() {
         Heat candidate = heat("HEAT-2", "TEAM-1", "A2", TEN.plusMinutes(5), Set.of(JudgeId.of("J2")));
 
-        assertEquals(List.of(ScheduleConflictDetector.TEAM_BUSY), codesOf(candidate));
+        assertEquals(List.of(ScheduleConflictType.TEAM_BUSY), typesOf(candidate));
     }
 
     @Test
     void detectsThatAJudgeIsAssignedToAnotherHeatAtTheSameTime() {
         Heat candidate = heat("HEAT-2", "TEAM-2", "A2", TEN.plusMinutes(5), Set.of(JudgeId.of("J1")));
 
-        assertEquals(List.of(ScheduleConflictDetector.JUDGE_BUSY), codesOf(candidate));
+        assertEquals(List.of(ScheduleConflictType.JUDGE_BUSY), typesOf(candidate));
     }
 
-    private List<String> codesOf(Heat candidate) {
-        return detector.detect(List.of(scheduled), candidate).stream().map(ScheduleConflict::code).toList();
+    private List<ScheduleConflictType> typesOf(Heat candidate) {
+        return detector.detect(List.of(scheduled), candidate).stream().map(ScheduleConflict::type).toList();
     }
 
     private Heat heat(String id, String team, String arena, LocalDateTime start, Set<JudgeId> judges) {

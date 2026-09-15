@@ -8,7 +8,7 @@ tramita apelaciones y recalcula la tabla conservando los valores originales y ca
 
 ## Requisitos
 
-- JDK 25
+- JDK 21 o superior
 - Maven 3.9 o superior
 
 ## Compilar
@@ -59,5 +59,9 @@ src/main/java/com/dps/roboleague
 ├── infrastructure   adaptadores en memoria y composition root
 └── demo             recorrido de ejemplo sobre los casos de uso
 ```
+
+Las dependencias apuntan siempre hacia adentro: `domain` no importa nada de `application` ni de
+`infrastructure`, y el composition root expone únicamente puertos de entrada, así que ningún
+adaptador puede alcanzar un repositorio por su cuenta.
 
 Las decisiones de diseño están documentadas en [DESIGN.md](DESIGN.md).

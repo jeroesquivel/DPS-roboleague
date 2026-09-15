@@ -2,7 +2,7 @@ package com.dps.roboleague.domain.ranking;
 
 import com.dps.roboleague.domain.challenge.MetricKey;
 import com.dps.roboleague.domain.challenge.MetricValue;
-import com.dps.roboleague.domain.scoring.rule.PenaltyScoringRule;
+import com.dps.roboleague.domain.scoring.ContributionKind;
 import com.dps.roboleague.domain.shared.Points;
 import com.dps.roboleague.domain.shared.TeamId;
 import java.util.Comparator;
@@ -27,11 +27,12 @@ public record TeamScoreSummary(TeamId teamId, List<ScoredRun> runs) {
 
     public Points penaltyPoints() {
         return runs.stream()
-                .map(run -> run.breakdown().totalFor(PenaltyScoringRule.CODE))
+                .map(run -> run.breakdown().totalOf(ContributionKind.PENALTY))
                 .reduce(Points.ZERO, Points::plus);
     }
 
-    public Optional<MetricValue> bestMeasurement(MetricKey key) {
+    /** El valor más bajo que el equipo registró para esa métrica, si la midió alguna vez. */
+    public Optional<MetricValue> lowestMeasurement(MetricKey key) {
         return runs.stream()
                 .map(run -> run.measurements().find(key))
                 .flatMap(Optional::stream)

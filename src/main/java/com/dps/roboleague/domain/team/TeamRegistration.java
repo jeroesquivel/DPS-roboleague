@@ -41,16 +41,25 @@ public final class TeamRegistration {
     }
 
     public void accept() {
+        requireDecidable();
         this.status = RegistrationStatus.ACCEPTED;
         this.rejectionReasons = List.of();
     }
 
     public void reject(List<String> reasons) {
+        requireDecidable();
         if (reasons.isEmpty()) {
             throw new DomainException("a rejection requires at least one reason");
         }
         this.status = RegistrationStatus.REJECTED;
         this.rejectionReasons = List.copyOf(reasons);
+    }
+
+    private void requireDecidable() {
+        if (status != RegistrationStatus.SUBMITTED) {
+            throw new DomainException(
+                    "registration of team " + name + " was already resolved as " + status);
+        }
     }
 
     public boolean isAccepted() {
@@ -87,10 +96,6 @@ public final class TeamRegistration {
 
     public Robot robot() {
         return robot;
-    }
-
-    public List<TeamDocument> documents() {
-        return List.copyOf(documents.values());
     }
 
     public RegistrationStatus status() {

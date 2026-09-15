@@ -4,16 +4,28 @@ import com.dps.roboleague.domain.competition.RobotClass;
 import com.dps.roboleague.domain.shared.AgeRange;
 import com.dps.roboleague.domain.shared.CompetitionId;
 import com.dps.roboleague.domain.shared.DateRange;
+import com.dps.roboleague.domain.shared.CategoryId;
 import com.dps.roboleague.domain.shared.SeasonId;
 import java.util.List;
 
 public interface CreateCompetition {
 
-    CompetitionId execute(Command command);
+    Result execute(Command command);
 
     record Command(SeasonId seasonId, String name, DateRange period, List<CategoryDraft> categories, String actor) {
     }
 
     record CategoryDraft(String name, AgeRange ageRange, RobotClass robotClass) {
+    }
+
+    /**
+     * Devuelve las categorías creadas para que quien invoca no tenga que ir a buscarlas al
+     * repositorio: un adaptador de entrada sólo habla con puertos de entrada.
+     */
+    record Result(CompetitionId competitionId, List<CategoryId> categoryIds) {
+
+        public CategoryId firstCategory() {
+            return categoryIds.getFirst();
+        }
     }
 }

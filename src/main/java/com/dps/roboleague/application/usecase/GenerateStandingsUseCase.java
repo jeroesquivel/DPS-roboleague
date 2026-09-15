@@ -6,7 +6,7 @@ import com.dps.roboleague.application.port.out.AuditLog;
 import com.dps.roboleague.application.port.out.CompetitionRepository;
 import com.dps.roboleague.application.port.out.RulebookRepository;
 import com.dps.roboleague.application.port.out.StandingsRepository;
-import com.dps.roboleague.application.service.CategoryScoreCollector;
+import com.dps.roboleague.application.service.CategoryScoringService;
 import com.dps.roboleague.domain.audit.AuditAction;
 import com.dps.roboleague.domain.audit.AuditEvent;
 import com.dps.roboleague.domain.competition.Competition;
@@ -25,18 +25,18 @@ public final class GenerateStandingsUseCase implements GenerateStandings {
     private final CompetitionRepository competitions;
     private final RulebookRepository rulebooks;
     private final StandingsRepository standings;
-    private final CategoryScoreCollector scoreCollector;
+    private final CategoryScoringService scoringService;
     private final RankingService rankingService;
     private final AuditLog auditLog;
     private final Clock clock;
 
     public GenerateStandingsUseCase(CompetitionRepository competitions, RulebookRepository rulebooks,
-            StandingsRepository standings, CategoryScoreCollector scoreCollector, RankingService rankingService,
+            StandingsRepository standings, CategoryScoringService scoringService, RankingService rankingService,
             AuditLog auditLog, Clock clock) {
         this.competitions = competitions;
         this.rulebooks = rulebooks;
         this.standings = standings;
-        this.scoreCollector = scoreCollector;
+        this.scoringService = scoringService;
         this.rankingService = rankingService;
         this.auditLog = auditLog;
         this.clock = clock;
@@ -55,7 +55,7 @@ public final class GenerateStandingsUseCase implements GenerateStandings {
         Rulebook rulebook = rulebooks.find(competition.id(), version)
                 .orElseThrow(() -> NotFoundException.of("Rulebook", version.toString()));
         List<StandingEntry> entries = rankingService.rank(
-                scoreCollector.collect(competition.id(), command.categoryId()), rulebook.tiebreakRules());
+                scoringService.collect(competition.id(), command.categoryId()), rulebook.tiebreakRules());
 
         Standings generated = Standings.provisional(competition.id(), command.categoryId(), version, clock.instant(),
                 entries);

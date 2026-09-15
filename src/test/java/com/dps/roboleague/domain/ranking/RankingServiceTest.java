@@ -10,8 +10,8 @@ import com.dps.roboleague.domain.ranking.rule.FastestMetricTiebreak;
 import com.dps.roboleague.domain.ranking.rule.FewestPenaltiesTiebreak;
 import com.dps.roboleague.domain.ranking.rule.HighestSingleRunTiebreak;
 import com.dps.roboleague.domain.scoring.ScoreBreakdown;
+import com.dps.roboleague.domain.scoring.ScoringRuleCode;
 import com.dps.roboleague.domain.scoring.ScoreContribution;
-import com.dps.roboleague.domain.scoring.rule.PenaltyScoringRule;
 import com.dps.roboleague.domain.shared.ChallengeId;
 import com.dps.roboleague.domain.shared.Points;
 import com.dps.roboleague.domain.shared.RunId;
@@ -47,7 +47,8 @@ class RankingServiceTest {
         List<StandingEntry> standings = rankingService.rank(List.of(steady, explosive), TIEBREAKS);
 
         assertEquals(List.of("EXPLOSIVE", "STEADY"), teamsOf(standings));
-        assertEquals(List.of(HighestSingleRunTiebreak.CODE), standings.get(1).appliedTiebreaks());
+        assertEquals(List.of(HighestSingleRunTiebreak.CODE), codesOf(standings.get(1)));
+        assertTrue(standings.get(1).appliedTiebreaks().getFirst().description().contains("highest single run"));
     }
 
     @Test
@@ -58,7 +59,7 @@ class RankingServiceTest {
         List<StandingEntry> standings = rankingService.rank(List.of(clean, punished), TIEBREAKS);
 
         assertEquals(List.of("CLEAN", "PUNISHED"), teamsOf(standings));
-        assertEquals(List.of(FewestPenaltiesTiebreak.CODE), standings.get(1).appliedTiebreaks());
+        assertEquals(List.of(FewestPenaltiesTiebreak.CODE), codesOf(standings.get(1)));
     }
 
     @Test
@@ -79,12 +80,18 @@ class RankingServiceTest {
 
     private ScoredRun run(String runId, String basePoints, String penaltyPoints, String seconds) {
         List<ScoreContribution> contributions = new ArrayList<>();
-        contributions.add(new ScoreContribution("CHALLENGE", "base score", Points.of(basePoints)));
+        contributions.add(ScoreContribution.earned(ScoringRuleCode.of("CHALLENGE"), "base score",
+                Points.of(basePoints)));
         if (penaltyPoints != null) {
-            contributions.add(new ScoreContribution(PenaltyScoringRule.CODE, "penalty", Points.of(penaltyPoints)));
+            contributions.add(ScoreContribution.penalty(ScoringRuleCode.of("CHALLENGE"), "penalty",
+                    Points.of(penaltyPoints)));
         }
         return new ScoredRun(RunId.of(runId), ChallengeId.of("RESCUE"),
                 MeasurementSet.empty().with(TIME, MetricValue.of(seconds)), new ScoreBreakdown(contributions));
+    }
+
+    private List<String> codesOf(StandingEntry entry) {
+        return entry.appliedTiebreaks().stream().map(AppliedTiebreak::code).toList();
     }
 
     private List<String> teamsOf(List<StandingEntry> standings) {

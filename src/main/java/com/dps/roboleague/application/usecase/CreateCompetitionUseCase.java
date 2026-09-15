@@ -11,7 +11,6 @@ import com.dps.roboleague.domain.audit.AuditEvent;
 import com.dps.roboleague.domain.competition.Category;
 import com.dps.roboleague.domain.competition.Competition;
 import com.dps.roboleague.domain.competition.Season;
-import com.dps.roboleague.domain.shared.CategoryId;
 import com.dps.roboleague.domain.shared.CompetitionId;
 import java.time.Clock;
 import java.util.List;
@@ -34,18 +33,18 @@ public final class CreateCompetitionUseCase implements CreateCompetition {
     }
 
     @Override
-    public CompetitionId execute(Command command) {
+    public Result execute(Command command) {
         Season season = seasons.findById(command.seasonId())
                 .orElseThrow(() -> NotFoundException.of("Season", command.seasonId().value()));
         season.requireCompetitionPeriodInside(command.period());
 
-        CompetitionId id = CompetitionId.of(idGenerator.nextId("COMPETITION"));
+        CompetitionId id = idGenerator.nextCompetitionId();
         List<Category> categories = command.categories().stream()
-                .map(draft -> new Category(CategoryId.of(idGenerator.nextId("CATEGORY")), draft.name(),
-                        draft.ageRange(), draft.robotClass()))
+                .map(draft -> new Category(idGenerator.nextCategoryId(), draft.name(), draft.ageRange(),
+                        draft.robotClass()))
                 .toList();
         competitions.save(new Competition(id, season.id(), command.name(), command.period(), categories));
         auditLog.record(AuditEvent.of(clock.instant(), AuditAction.COMPETITION_CREATED, id.value(), command.actor()));
-        return id;
+        return new Result(id, categories.stream().map(Category::id).toList());
     }
 }

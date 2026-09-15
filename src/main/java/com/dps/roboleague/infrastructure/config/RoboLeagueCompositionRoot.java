@@ -4,7 +4,14 @@ import com.dps.roboleague.application.port.in.CalculateRunScore;
 import com.dps.roboleague.application.port.in.CaptureRunResult;
 import com.dps.roboleague.application.port.in.CreateCompetition;
 import com.dps.roboleague.application.port.in.CreateSeason;
+import com.dps.roboleague.application.port.in.FindAppeal;
+import com.dps.roboleague.application.port.in.FindAuditTrail;
+import com.dps.roboleague.application.port.in.FindCompetition;
+import com.dps.roboleague.application.port.in.FindRound;
+import com.dps.roboleague.application.port.in.FindRunResult;
+import com.dps.roboleague.application.port.in.FindTeamRegistration;
 import com.dps.roboleague.application.port.in.GenerateStandings;
+import com.dps.roboleague.application.port.in.GetStandings;
 import com.dps.roboleague.application.port.in.PublishRulebook;
 import com.dps.roboleague.application.port.in.PublishStandings;
 import com.dps.roboleague.application.port.in.RecalculateStandings;
@@ -22,12 +29,19 @@ import com.dps.roboleague.application.port.out.RunResultRepository;
 import com.dps.roboleague.application.port.out.SeasonRepository;
 import com.dps.roboleague.application.port.out.StandingsRepository;
 import com.dps.roboleague.application.port.out.TeamRegistrationRepository;
-import com.dps.roboleague.application.service.CategoryScoreCollector;
+import com.dps.roboleague.application.service.CategoryScoringService;
 import com.dps.roboleague.application.usecase.CalculateRunScoreUseCase;
 import com.dps.roboleague.application.usecase.CaptureRunResultUseCase;
 import com.dps.roboleague.application.usecase.CreateCompetitionUseCase;
 import com.dps.roboleague.application.usecase.CreateSeasonUseCase;
+import com.dps.roboleague.application.usecase.FindAppealUseCase;
+import com.dps.roboleague.application.usecase.FindAuditTrailUseCase;
+import com.dps.roboleague.application.usecase.FindCompetitionUseCase;
+import com.dps.roboleague.application.usecase.FindRoundUseCase;
+import com.dps.roboleague.application.usecase.FindRunResultUseCase;
+import com.dps.roboleague.application.usecase.FindTeamRegistrationUseCase;
 import com.dps.roboleague.application.usecase.GenerateStandingsUseCase;
+import com.dps.roboleague.application.usecase.GetStandingsUseCase;
 import com.dps.roboleague.application.usecase.PublishRulebookUseCase;
 import com.dps.roboleague.application.usecase.PublishStandingsUseCase;
 import com.dps.roboleague.application.usecase.RecalculateStandingsUseCase;
@@ -50,9 +64,12 @@ import com.dps.roboleague.infrastructure.memory.InMemoryTeamRegistrationReposito
 import java.time.Clock;
 
 /**
- * Composition root: the only place where use cases are bound to concrete adapters.
+ * El único lugar donde los casos de uso se atan a adaptadores concretos.
+ *
+ * <p>Sólo expone puertos de entrada: quien lo usa —el ejecutable, un futuro controller REST, los
+ * tests— no puede alcanzar un repositorio ni saltearse el negocio. Leer también es un caso de uso.
  */
-public final class RoboLeagueModule {
+public final class RoboLeagueCompositionRoot {
 
     private final SeasonRepository seasons;
     private final CompetitionRepository competitions;
@@ -63,16 +80,16 @@ public final class RoboLeagueModule {
     private final StandingsRepository standings;
     private final AppealRepository appeals;
     private final AuditLog auditLog;
-    private final CategoryScoreCollector scoreCollector;
+    private final CategoryScoringService scoringService;
     private final RankingService rankingService = new RankingService();
     private final ScheduleConflictDetector conflictDetector = new ScheduleConflictDetector();
     private final IdGenerator idGenerator;
     private final Clock clock;
 
-    public RoboLeagueModule(SeasonRepository seasons, CompetitionRepository competitions, RulebookRepository rulebooks,
-            TeamRegistrationRepository registrations, RoundRepository rounds, RunResultRepository runResults,
-            StandingsRepository standings, AppealRepository appeals, AuditLog auditLog, IdGenerator idGenerator,
-            Clock clock) {
+    public RoboLeagueCompositionRoot(SeasonRepository seasons, CompetitionRepository competitions,
+            RulebookRepository rulebooks, TeamRegistrationRepository registrations, RoundRepository rounds,
+            RunResultRepository runResults, StandingsRepository standings, AppealRepository appeals, AuditLog auditLog,
+            IdGenerator idGenerator, Clock clock) {
         this.seasons = seasons;
         this.competitions = competitions;
         this.rulebooks = rulebooks;
@@ -84,91 +101,95 @@ public final class RoboLeagueModule {
         this.auditLog = auditLog;
         this.idGenerator = idGenerator;
         this.clock = clock;
-        this.scoreCollector = new CategoryScoreCollector(rounds, runResults, rulebooks);
+        this.scoringService = new CategoryScoringService(rounds, runResults, rulebooks);
     }
 
-    public static RoboLeagueModule inMemory(Clock clock) {
-        return new RoboLeagueModule(new InMemorySeasonRepository(), new InMemoryCompetitionRepository(),
+    public static RoboLeagueCompositionRoot inMemory(Clock clock) {
+        return new RoboLeagueCompositionRoot(new InMemorySeasonRepository(), new InMemoryCompetitionRepository(),
                 new InMemoryRulebookRepository(), new InMemoryTeamRegistrationRepository(),
                 new InMemoryRoundRepository(), new InMemoryRunResultRepository(), new InMemoryStandingsRepository(),
                 new InMemoryAppealRepository(), new InMemoryAuditLog(), new SequentialIdGenerator(), clock);
     }
 
-    public CreateSeason createSeason() {
+    // --- casos de uso de escritura ---
+
+    public CreateSeason createSeasonUseCase() {
         return new CreateSeasonUseCase(seasons, idGenerator, auditLog, clock);
     }
 
-    public CreateCompetition createCompetition() {
+    public CreateCompetition createCompetitionUseCase() {
         return new CreateCompetitionUseCase(seasons, competitions, idGenerator, auditLog, clock);
     }
 
-    public PublishRulebook publishRulebook() {
+    public PublishRulebook publishRulebookUseCase() {
         return new PublishRulebookUseCase(competitions, rulebooks, auditLog, clock);
     }
 
-    public RegisterTeam registerTeam() {
+    public RegisterTeam registerTeamUseCase() {
         return new RegisterTeamUseCase(competitions, rulebooks, registrations, idGenerator, auditLog, clock);
     }
 
-    public ScheduleRound scheduleRound() {
+    public ScheduleRound scheduleRoundUseCase() {
         return new ScheduleRoundUseCase(competitions, rulebooks, registrations, rounds, conflictDetector, idGenerator,
                 auditLog, clock);
     }
 
-    public CaptureRunResult captureRunResult() {
+    public CaptureRunResult captureRunResultUseCase() {
         return new CaptureRunResultUseCase(rounds, rulebooks, runResults, idGenerator, auditLog, clock);
     }
 
-    public CalculateRunScore calculateRunScore() {
-        return new CalculateRunScoreUseCase(runResults, rounds, scoreCollector);
-    }
-
-    public GenerateStandings generateStandings() {
-        return new GenerateStandingsUseCase(competitions, rulebooks, standings, scoreCollector, rankingService,
+    public GenerateStandings generateStandingsUseCase() {
+        return new GenerateStandingsUseCase(competitions, rulebooks, standings, scoringService, rankingService,
                 auditLog, clock);
     }
 
-    public PublishStandings publishStandings() {
+    public PublishStandings publishStandingsUseCase() {
         return new PublishStandingsUseCase(standings, auditLog, clock);
     }
 
-    public SubmitAppeal submitAppeal() {
+    public SubmitAppeal submitAppealUseCase() {
         return new SubmitAppealUseCase(runResults, appeals, idGenerator, auditLog, clock);
     }
 
-    public ResolveAppeal resolveAppeal() {
+    public ResolveAppeal resolveAppealUseCase() {
         return new ResolveAppealUseCase(appeals, runResults, rounds, rulebooks, auditLog, clock);
     }
 
-    public RecalculateStandings recalculateStandings() {
-        return new RecalculateStandingsUseCase(standings, rulebooks, scoreCollector, rankingService, auditLog, clock);
+    public RecalculateStandings recalculateStandingsUseCase() {
+        return new RecalculateStandingsUseCase(standings, rulebooks, scoringService, rankingService, auditLog, clock);
     }
 
-    public CompetitionRepository competitions() {
-        return competitions;
+    // --- casos de uso de consulta ---
+
+    public CalculateRunScore calculateRunScoreUseCase() {
+        return new CalculateRunScoreUseCase(runResults, rounds, scoringService);
     }
 
-    public TeamRegistrationRepository registrations() {
-        return registrations;
+    public FindCompetition findCompetitionUseCase() {
+        return new FindCompetitionUseCase(competitions);
     }
 
-    public RoundRepository rounds() {
-        return rounds;
+    public FindTeamRegistration findTeamRegistrationUseCase() {
+        return new FindTeamRegistrationUseCase(registrations);
     }
 
-    public AppealRepository appeals() {
-        return appeals;
+    public FindRound findRoundUseCase() {
+        return new FindRoundUseCase(rounds);
     }
 
-    public RunResultRepository runResults() {
-        return runResults;
+    public FindRunResult findRunResultUseCase() {
+        return new FindRunResultUseCase(runResults);
     }
 
-    public StandingsRepository standings() {
-        return standings;
+    public FindAppeal findAppealUseCase() {
+        return new FindAppealUseCase(appeals);
     }
 
-    public AuditLog auditLog() {
-        return auditLog;
+    public GetStandings getStandingsUseCase() {
+        return new GetStandingsUseCase(standings);
+    }
+
+    public FindAuditTrail findAuditTrailUseCase() {
+        return new FindAuditTrailUseCase(auditLog);
     }
 }

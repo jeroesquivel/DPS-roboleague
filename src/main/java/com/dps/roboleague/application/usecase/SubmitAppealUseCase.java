@@ -40,7 +40,7 @@ public final class SubmitAppealUseCase implements SubmitAppeal {
             throw new DomainException("team " + command.teamId().value() + " cannot appeal a run of another team");
         }
 
-        AppealId appealId = AppealId.of(idGenerator.nextId("APPEAL"));
+        AppealId appealId = idGenerator.nextAppealId();
         appeals.save(new Appeal(appealId, run.id(), command.teamId(), command.claim(), clock.instant()));
         auditLog.record(new AuditEvent(clock.instant(), AuditAction.APPEAL_SUBMITTED, appealId.value(),
                 command.actor(), Map.of("run", run.id().value())));

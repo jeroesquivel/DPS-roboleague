@@ -12,11 +12,13 @@ import com.dps.roboleague.domain.appeal.AppealDecision;
 import com.dps.roboleague.domain.appeal.AppealStatus;
 import com.dps.roboleague.domain.audit.AuditAction;
 import com.dps.roboleague.domain.audit.AuditEvent;
+import com.dps.roboleague.domain.challenge.ChallengeSpec;
 import com.dps.roboleague.domain.result.ResultCorrection;
 import com.dps.roboleague.domain.result.RunResult;
 import com.dps.roboleague.domain.schedule.Round;
 import java.time.Clock;
 import java.util.Map;
+import java.util.Optional;
 
 public final class ResolveAppealUseCase implements ResolveAppeal {
 
@@ -41,39 +43,55 @@ public final class ResolveAppealUseCase implements ResolveAppeal {
     public AppealStatus execute(Command command) {
         Appeal appeal = appeals.findById(command.appealId())
                 .orElseThrow(() -> NotFoundException.of("Appeal", command.appealId().value()));
-        AppealDecision decision = new AppealDecision(command.reviewer(), command.rationale(), clock.instant());
 
+        // Todo lo que puede fallar se resuelve antes de tocar el agregado: una corrección que el
+        // desafío rechaza no puede dejar la apelación resuelta a medias.
+        Optional<PendingCorrection> pending = command.accepted()
+                ? command.correction().map(correction -> validate(appeal, correction))
+                : Optional.empty();
+
+        AppealDecision decision = new AppealDecision(command.reviewer(), command.rationale(), clock.instant());
         if (command.accepted()) {
             appeal.accept(decision);
-            command.correction().ifPresent(correction -> correct(appeal, correction, command.actor()));
         } else {
             appeal.reject(decision);
         }
         appeals.save(appeal);
+
+        pending.ifPresent(correction -> apply(appeal, correction, command.actor()));
 
         auditLog.record(new AuditEvent(clock.instant(), AuditAction.APPEAL_RESOLVED, appeal.id().value(),
                 command.actor(), Map.of("status", appeal.status().name(), "rationale", decision.rationale())));
         return appeal.status();
     }
 
-    private void correct(Appeal appeal, Correction correction, String actor) {
+    /** Comprueba que la corrección es admisible para el reglamento fijado en la corrida. */
+    private PendingCorrection validate(Appeal appeal, Correction correction) {
         RunResult run = runResults.findById(appeal.runId())
                 .orElseThrow(() -> NotFoundException.of("RunResult", appeal.runId().value()));
         Round round = rounds.findById(run.roundId())
                 .orElseThrow(() -> NotFoundException.of("Round", run.roundId().value()));
-        rulebooks.find(round.competitionId(), run.rulebookVersion())
+        ChallengeSpec challenge = rulebooks.find(round.competitionId(), run.rulebookVersion())
                 .orElseThrow(() -> NotFoundException.of("Rulebook", run.rulebookVersion().toString()))
-                .challenge(run.challengeId())
-                .validate(correction.measurements());
+                .challenge(run.challengeId());
+        challenge.validate(correction.measurements());
+        challenge.validateIncidents(correction.incidents());
+        return new PendingCorrection(run, correction);
+    }
 
+    private void apply(Appeal appeal, PendingCorrection pending, String actor) {
+        RunResult run = pending.run();
         String reason = "appeal " + appeal.id().value() + " accepted";
         run.applyCorrection(ResultCorrection.fromAppeal(appeal.id(), clock.instant(), actor, reason,
-                correction.measurements(), correction.incidents()));
+                pending.correction().measurements(), pending.correction().incidents()));
         runResults.save(run);
 
         auditLog.record(new AuditEvent(clock.instant(), AuditAction.RESULT_CORRECTED, run.id().value(), actor,
                 Map.of("original", run.originalMeasurements().values().toString(),
                         "corrected", run.currentMeasurements().values().toString(),
                         "reason", reason)));
+    }
+
+    private record PendingCorrection(RunResult run, Correction correction) {
     }
 }

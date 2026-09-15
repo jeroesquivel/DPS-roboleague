@@ -23,11 +23,6 @@ public final class RobotSpecificationRule implements EligibilityRule {
     }
 
     @Override
-    public String code() {
-        return CODE;
-    }
-
-    @Override
     public List<EligibilityViolation> evaluate(EligibilityRequest request) {
         List<EligibilityViolation> violations = new ArrayList<>();
         Robot robot = request.registration().robot();

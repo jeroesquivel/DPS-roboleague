@@ -9,18 +9,22 @@ public record ScoreBreakdown(List<ScoreContribution> contributions) {
         contributions = List.copyOf(contributions);
     }
 
-    public static ScoreBreakdown empty() {
-        return new ScoreBreakdown(List.of());
-    }
-
     public Points total() {
-        return contributions.stream().map(ScoreContribution::points).reduce(Points.ZERO, Points::plus);
+        return sumOf(contributions.stream().toList());
     }
 
-    public Points totalFor(String ruleCode) {
-        return contributions.stream()
+    /** Lo aportado por las contribuciones de una naturaleza dada, sin saber qué regla las produjo. */
+    public Points totalOf(ContributionKind kind) {
+        return sumOf(contributions.stream().filter(contribution -> contribution.kind() == kind).toList());
+    }
+
+    public Points totalFor(ScoringRuleCode ruleCode) {
+        return sumOf(contributions.stream()
                 .filter(contribution -> contribution.ruleCode().equals(ruleCode))
-                .map(ScoreContribution::points)
-                .reduce(Points.ZERO, Points::plus);
+                .toList());
+    }
+
+    private Points sumOf(List<ScoreContribution> selected) {
+        return selected.stream().map(ScoreContribution::points).reduce(Points.ZERO, Points::plus);
     }
 }

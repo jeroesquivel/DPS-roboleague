@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.dps.roboleague.domain.scoring.IncidentReport;
+import com.dps.roboleague.domain.scoring.PenaltyCode;
+import com.dps.roboleague.domain.scoring.PenaltyDefinition;
 import com.dps.roboleague.domain.scoring.rule.ObjectiveScoringRule;
 import com.dps.roboleague.domain.shared.ChallengeId;
 import com.dps.roboleague.domain.shared.DomainException;
@@ -16,12 +19,14 @@ class ChallengeSpecTest {
     private static final MetricKey TIME = MetricKey.of("TIME");
     private static final MetricKey OBJECTIVES = MetricKey.of("OBJECTIVES");
     private static final MetricKey DESIGN = MetricKey.of("DESIGN");
+    private static final PenaltyCode RESTART = PenaltyCode.of("RESTART");
 
     private final ChallengeSpec challenge = new ChallengeSpec(ChallengeId.of("RESCUE"), "Rescue mission",
             List.of(MetricDefinition.required(TIME, MetricKind.TIME_SECONDS, "s"),
                     MetricDefinition.required(OBJECTIVES, MetricKind.OBJECTIVE_COUNT, "objectives"),
                     MetricDefinition.optional(DESIGN, MetricKind.JUDGE_CRITERION, "points")),
-            new ObjectiveScoringRule(OBJECTIVES, Points.of(10), 5), 2);
+            new ObjectiveScoringRule(OBJECTIVES, Points.of(10), 5),
+            List.of(new PenaltyDefinition(RESTART, "manual restart", Points.of(3))), 2);
 
     @Test
     void acceptsAMeasurementSetThatCoversEveryRequiredMetric() {
@@ -57,6 +62,19 @@ class ChallengeSpecTest {
     void rejectsAttemptsBeyondTheConfiguredLimit() {
         assertDoesNotThrow(() -> challenge.requireAttemptWithinLimit(2));
         assertThrows(DomainException.class, () -> challenge.requireAttemptWithinLimit(3));
+    }
+
+    @Test
+    void acceptsIncidentsThatTheRulebookDefines() {
+        assertDoesNotThrow(() -> challenge.validateIncidents(List.of(IncidentReport.once(RESTART))));
+    }
+
+    @Test
+    void rejectsIncidentsThatTheRulebookDoesNotDefineWhenTheResultIsCaptured() {
+        DomainException error = assertThrows(DomainException.class,
+                () -> challenge.validateIncidents(List.of(IncidentReport.once(PenaltyCode.of("SABOTAGE")))));
+
+        assertTrue(error.getMessage().contains("SABOTAGE"));
     }
 
     private MeasurementSet complete() {

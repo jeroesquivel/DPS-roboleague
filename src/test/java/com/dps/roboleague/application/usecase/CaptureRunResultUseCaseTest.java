@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dps.roboleague.application.port.in.CaptureRunResult;
-import com.dps.roboleague.demo.DemoRulebook;
+import com.dps.roboleague.support.RescueEditionFixture;
 import com.dps.roboleague.domain.challenge.MeasurementSet;
 import com.dps.roboleague.domain.challenge.MetricValue;
 import com.dps.roboleague.domain.result.RunResult;
@@ -29,19 +29,19 @@ class CaptureRunResultUseCaseTest {
     void capturesTheRunPinningTheRulebookVersionInForce() {
         RunId runId = edition.capture(roundId, delta, "95.5", 4, "42", List.of(8, 9), List.of());
 
-        RunResult stored = edition.module().runResults().findById(runId).orElseThrow();
+        RunResult stored = edition.runResult(runId);
 
         assertEquals(RulebookVersion.first(), stored.rulebookVersion());
         assertEquals(RunStatus.CAPTURED, stored.status());
-        assertEquals(MetricValue.of(4), stored.originalMeasurements().require(DemoRulebook.OBJECTIVES));
+        assertEquals(MetricValue.of(4), stored.originalMeasurements().require(RescueEditionFixture.OBJECTIVES));
         assertEquals(2, stored.evaluations().size());
     }
 
     @Test
     void rejectsMeasurementsThatTheChallengeDoesNotAccept() {
         MeasurementSet withoutObjectives = MeasurementSet.empty()
-                .with(DemoRulebook.TIME, MetricValue.of("95.5"))
-                .with(DemoRulebook.ENERGY, MetricValue.of("42"));
+                .with(RescueEditionFixture.TIME, MetricValue.of("95.5"))
+                .with(RescueEditionFixture.ENERGY, MetricValue.of("42"));
 
         assertThrows(DomainException.class, () -> capture(1, withoutObjectives));
     }
@@ -65,13 +65,13 @@ class CaptureRunResultUseCaseTest {
     void rejectsTeamsWithoutAHeatInTheRound() {
         TeamId omega = edition.registerEligibleTeam("Omega Crew");
 
-        assertThrows(DomainException.class, () -> edition.module().captureRunResult()
+        assertThrows(DomainException.class, () -> edition.module().captureRunResultUseCase()
                 .execute(new CaptureRunResult.Command(roundId, omega, 1, edition.measurements("95.5", 4, "42"),
                         List.of(), List.of(), TestEdition.ACTOR)));
     }
 
     private RunId capture(int attempt, MeasurementSet measurements) {
-        return edition.module().captureRunResult().execute(new CaptureRunResult.Command(roundId, delta, attempt,
+        return edition.module().captureRunResultUseCase().execute(new CaptureRunResult.Command(roundId, delta, attempt,
                 measurements, List.of(), List.of(), TestEdition.ACTOR));
     }
 }

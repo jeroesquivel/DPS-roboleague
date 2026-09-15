@@ -50,9 +50,10 @@ public final class CaptureRunResultUseCase implements CaptureRunResult {
                 .challenge(round.challengeId());
         challenge.requireAttemptWithinLimit(command.attemptNumber());
         challenge.validate(command.measurements());
+        challenge.validateIncidents(command.incidents());
         requireUnusedAttempt(command);
 
-        RunId runId = RunId.of(idGenerator.nextId("RUN"));
+        RunId runId = idGenerator.nextRunId();
         RunResult result = new RunResult(runId, round.id(), heat.id(), command.teamId(), round.challengeId(),
                 round.rulebookVersion(), command.attemptNumber(), clock.instant(), command.measurements(),
                 command.evaluations(), command.incidents());

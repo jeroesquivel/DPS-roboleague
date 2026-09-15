@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dps.roboleague.domain.rulebook.RulebookVersion;
 import com.dps.roboleague.domain.schedule.Round;
-import com.dps.roboleague.domain.schedule.ScheduleConflictDetector;
+import com.dps.roboleague.domain.schedule.ScheduleConflictType;
 import com.dps.roboleague.domain.shared.DomainException;
 import com.dps.roboleague.domain.shared.RoundId;
 import com.dps.roboleague.domain.shared.TeamId;
@@ -29,7 +29,7 @@ class ScheduleRoundUseCaseTest {
 
         RoundId roundId = edition.scheduleRoundFor(1, List.of(delta, omega));
 
-        Round round = edition.module().rounds().findById(roundId).orElseThrow();
+        Round round = edition.round(roundId);
 
         assertEquals(2, round.heats().size());
         assertEquals(RulebookVersion.first(), round.rulebookVersion());
@@ -46,7 +46,25 @@ class ScheduleRoundUseCaseTest {
         DomainException error = assertThrows(DomainException.class,
                 () -> edition.scheduleRound(2, List.of(edition.heat(omega, "A1", TEN.plusMinutes(5)))));
 
-        assertTrue(error.getMessage().contains(ScheduleConflictDetector.ARENA_BUSY));
+        assertTrue(error.getMessage().contains(ScheduleConflictType.ARENA_BUSY.name()));
+    }
+
+    @Test
+    void rejectsAHeatScheduledOutsideThePeriodOfTheCompetition() {
+        TeamId delta = edition.registerEligibleTeam("Delta Bots");
+
+        DomainException error = assertThrows(DomainException.class, () -> edition.scheduleRound(1,
+                List.of(edition.heat(delta, "A1", LocalDateTime.of(2027, 12, 25, 3, 0)))));
+
+        assertTrue(error.getMessage().contains("outside the period"));
+    }
+
+    @Test
+    void rejectsAHeatThatStartsInsideThePeriodButEndsAfterIt() {
+        TeamId delta = edition.registerEligibleTeam("Delta Bots");
+
+        assertThrows(DomainException.class, () -> edition.scheduleRound(1,
+                List.of(edition.heat(delta, "A1", TestEdition.LAST_DAY.atTime(23, 55)))));
     }
 
     @Test

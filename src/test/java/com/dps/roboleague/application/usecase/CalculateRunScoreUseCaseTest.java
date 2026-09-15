@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dps.roboleague.application.port.in.CalculateRunScore;
-import com.dps.roboleague.demo.DemoRulebook;
+import com.dps.roboleague.support.RescueEditionFixture;
 import com.dps.roboleague.domain.rulebook.RulebookVersion;
 import com.dps.roboleague.domain.scoring.ScoreBreakdown;
 import com.dps.roboleague.domain.scoring.ScoreContribution;
@@ -44,7 +44,7 @@ class CalculateRunScoreUseCaseTest {
     void keepsUsingTheRulebookVersionPinnedWhenTheResultWasCaptured() {
         RunId runUnderFirstRulebook = edition.capture(firstRound, delta, "95.5", 4, "42", List.of(8, 9), List.of());
 
-        edition.publishRulebookWith(new ObjectiveScoringRule(DemoRulebook.OBJECTIVES, Points.of(100), 5));
+        edition.publishRulebookWith(new ObjectiveScoringRule(RescueEditionFixture.OBJECTIVES, Points.of(100), 5));
         RoundId secondRound = edition.scheduleRound(2,
                 List.of(edition.heat(delta, "A2", LocalDateTime.of(2026, 3, 2, 12, 0))));
         RunId runUnderSecondRulebook = edition.capture(secondRound, delta, "95.5", 4, "42", List.of(8, 9), List.of());
@@ -56,6 +56,6 @@ class CalculateRunScoreUseCaseTest {
     }
 
     private CalculateRunScore.RunScore score(RunId runId) {
-        return edition.module().calculateRunScore().execute(new CalculateRunScore.Command(runId));
+        return edition.module().calculateRunScoreUseCase().execute(new CalculateRunScore.Command(runId));
     }
 }

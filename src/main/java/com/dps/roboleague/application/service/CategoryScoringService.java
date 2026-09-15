@@ -18,16 +18,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Scores every captured run of a category with the rulebook version pinned to that run, so a
- * recalculation always reproduces the figures of the edition the result belongs to.
+ * Puntúa cada corrida capturada de una categoría con la versión de reglamento fijada en esa corrida,
+ * de modo que un recálculo siempre reproduce las cifras de la edición a la que pertenece el
+ * resultado. Generar y recalcular comparten este servicio para que no puedan divergir.
  */
-public final class CategoryScoreCollector {
+public final class CategoryScoringService {
 
     private final RoundRepository rounds;
     private final RunResultRepository runResults;
     private final RulebookRepository rulebooks;
 
-    public CategoryScoreCollector(RoundRepository rounds, RunResultRepository runResults,
+    public CategoryScoringService(RoundRepository rounds, RunResultRepository runResults,
             RulebookRepository rulebooks) {
         this.rounds = rounds;
         this.runResults = runResults;

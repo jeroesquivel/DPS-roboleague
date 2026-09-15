@@ -11,11 +11,6 @@ public final class RobotClassRule implements EligibilityRule {
     public static final String CODE = "ROBOT_CLASS";
 
     @Override
-    public String code() {
-        return CODE;
-    }
-
-    @Override
     public List<EligibilityViolation> evaluate(EligibilityRequest request) {
         RobotClass declared = request.registration().robot().robotClass();
         RobotClass expected = request.category().robotClass();

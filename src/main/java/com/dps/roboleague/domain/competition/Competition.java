@@ -6,6 +6,7 @@ import com.dps.roboleague.domain.shared.CompetitionId;
 import com.dps.roboleague.domain.shared.DateRange;
 import com.dps.roboleague.domain.shared.DomainException;
 import com.dps.roboleague.domain.shared.SeasonId;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,6 +48,15 @@ public final class Competition {
             throw new DomainException("category " + categoryId.value() + " does not belong to competition " + name);
         }
         return category;
+    }
+
+    /** Nada de la competencia puede agendarse fuera de las fechas que la definen. */
+    public void requireDateWithinPeriod(LocalDate date) {
+        Objects.requireNonNull(date, "date is required");
+        if (!period.contains(date)) {
+            throw new DomainException(
+                    "date " + date + " is outside the period of competition " + name);
+        }
     }
 
     public void activateRulebook(RulebookVersion version) {

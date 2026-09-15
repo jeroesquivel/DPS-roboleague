@@ -15,7 +15,6 @@ import com.dps.roboleague.domain.eligibility.EligibilityRequest;
 import com.dps.roboleague.domain.eligibility.EligibilityVerdict;
 import com.dps.roboleague.domain.rulebook.Rulebook;
 import com.dps.roboleague.domain.rulebook.RulebookVersion;
-import com.dps.roboleague.domain.shared.TeamId;
 import com.dps.roboleague.domain.team.TeamRegistration;
 import java.time.Clock;
 import java.util.Map;
@@ -48,7 +47,7 @@ public final class RegisterTeamUseCase implements RegisterTeam {
         Rulebook rulebook = rulebooks.find(competition.id(), version)
                 .orElseThrow(() -> NotFoundException.of("Rulebook", version.toString()));
 
-        TeamRegistration registration = new TeamRegistration(TeamId.of(idGenerator.nextId("TEAM")), competition.id(),
+        TeamRegistration registration = new TeamRegistration(idGenerator.nextTeamId(), competition.id(),
                 category.id(), command.teamName(), command.members(), command.robot(), command.documents());
 
         EligibilityVerdict verdict = rulebook.eligibilityPolicy()

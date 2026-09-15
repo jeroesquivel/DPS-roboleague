@@ -17,7 +17,6 @@ import com.dps.roboleague.domain.schedule.Round;
 import com.dps.roboleague.domain.schedule.ScheduleConflict;
 import com.dps.roboleague.domain.schedule.ScheduleConflictDetector;
 import com.dps.roboleague.domain.shared.DomainException;
-import com.dps.roboleague.domain.shared.HeatId;
 import com.dps.roboleague.domain.shared.RoundId;
 import com.dps.roboleague.domain.team.TeamRegistration;
 import java.time.Clock;
@@ -60,15 +59,16 @@ public final class ScheduleRoundUseCase implements ScheduleRound {
                 .orElseThrow(() -> NotFoundException.of("Rulebook", version.toString()))
                 .challenge(command.challengeId());
 
-        RoundId roundId = RoundId.of(idGenerator.nextId("ROUND"));
+        RoundId roundId = idGenerator.nextRoundId();
         Round round = new Round(roundId, competition.id(), command.categoryId(), command.challengeId(),
                 command.ordinal(), version);
         List<Heat> booked = new ArrayList<>(bookedHeats(competition));
 
         for (HeatDraft draft : command.heats()) {
             requireEligibleTeam(command, draft);
-            Heat heat = new Heat(HeatId.of(idGenerator.nextId("HEAT")), roundId, draft.teamId(), draft.arenaId(),
-                    draft.slot(), draft.judges());
+            requireSlotWithinCompetition(competition, draft);
+            Heat heat = new Heat(idGenerator.nextHeatId(), roundId, draft.teamId(), draft.arenaId(), draft.slot(),
+                    draft.judges());
             List<ScheduleConflict> conflicts = conflictDetector.detect(booked, heat);
             if (!conflicts.isEmpty()) {
                 throw new DomainException("the heat cannot be scheduled: " + describe(conflicts));
@@ -100,9 +100,14 @@ public final class ScheduleRoundUseCase implements ScheduleRound {
         }
     }
 
+    private void requireSlotWithinCompetition(Competition competition, HeatDraft draft) {
+        competition.requireDateWithinPeriod(draft.slot().start().toLocalDate());
+        competition.requireDateWithinPeriod(draft.slot().end().toLocalDate());
+    }
+
     private String describe(List<ScheduleConflict> conflicts) {
         return conflicts.stream()
-                .map(conflict -> conflict.code() + " (" + conflict.detail() + ")")
+                .map(conflict -> conflict.type() + " (" + conflict.detail() + ")")
                 .collect(Collectors.joining(", "));
     }
 }

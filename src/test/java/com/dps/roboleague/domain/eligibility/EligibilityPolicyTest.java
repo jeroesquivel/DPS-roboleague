@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.dps.roboleague.demo.DemoRulebook;
+import com.dps.roboleague.support.RescueEditionFixture;
 import com.dps.roboleague.domain.competition.Category;
 import com.dps.roboleague.domain.eligibility.rule.AgeRangeRule;
 import com.dps.roboleague.domain.eligibility.rule.RequiredDocumentsRule;
@@ -30,7 +30,7 @@ class EligibilityPolicyTest {
 
     private final Category junior = new Category(CategoryId.of("CAT-1"), "Junior", AgeRange.between(12, 17),
             TeamFixtures.RESCUE_BOT);
-    private final EligibilityPolicy policy = DemoRulebook.eligibilityPolicy();
+    private final EligibilityPolicy policy = RescueEditionFixture.eligibilityPolicy();
 
     @Test
     void acceptsATeamThatSatisfiesEveryRule() {

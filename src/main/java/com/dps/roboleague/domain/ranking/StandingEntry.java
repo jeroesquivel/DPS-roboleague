@@ -6,7 +6,8 @@ import com.dps.roboleague.domain.shared.TeamId;
 import java.util.List;
 import java.util.Objects;
 
-public record StandingEntry(int position, TeamId teamId, Points totalPoints, List<String> appliedTiebreaks) {
+public record StandingEntry(int position, TeamId teamId, Points totalPoints,
+        List<AppliedTiebreak> appliedTiebreaks) {
 
     public StandingEntry {
         Objects.requireNonNull(teamId, "team id is required");

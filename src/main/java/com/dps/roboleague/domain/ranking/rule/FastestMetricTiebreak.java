@@ -29,8 +29,8 @@ public final class FastestMetricTiebreak implements TiebreakRule {
 
     @Override
     public int compare(TeamScoreSummary left, TeamScoreSummary right) {
-        Optional<MetricValue> leftBest = left.bestMeasurement(metric);
-        Optional<MetricValue> rightBest = right.bestMeasurement(metric);
+        Optional<MetricValue> leftBest = left.lowestMeasurement(metric);
+        Optional<MetricValue> rightBest = right.lowestMeasurement(metric);
         if (leftBest.isEmpty() || rightBest.isEmpty()) {
             return Boolean.compare(leftBest.isEmpty(), rightBest.isEmpty());
         }

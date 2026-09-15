@@ -4,6 +4,7 @@ import com.dps.roboleague.domain.challenge.MetricKey;
 import com.dps.roboleague.domain.scoring.ScoreContribution;
 import com.dps.roboleague.domain.scoring.ScoringContext;
 import com.dps.roboleague.domain.scoring.ScoringRule;
+import com.dps.roboleague.domain.scoring.ScoringRuleCode;
 import com.dps.roboleague.domain.shared.Points;
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,7 +13,7 @@ import java.util.Objects;
 public record ResourceScoringRule(MetricKey metric, BigDecimal allowance, Points pointsPerUnitOver)
         implements ScoringRule {
 
-    public static final String CODE = "RESOURCE";
+    public static final ScoringRuleCode CODE = ScoringRuleCode.of("RESOURCE");
 
     public ResourceScoringRule {
         Objects.requireNonNull(metric, "metric is required");
@@ -21,16 +22,17 @@ public record ResourceScoringRule(MetricKey metric, BigDecimal allowance, Points
     }
 
     @Override
-    public String code() {
-        return CODE;
+    public List<ScoreContribution> apply(ScoringContext context) {
+        return context.measurements().amountOf(metric)
+                .map(this::contributionFor)
+                .orElseGet(() -> List.of(ScoreContribution.penalty(CODE,
+                        "no measurement recorded for " + metric.value(), Points.ZERO)));
     }
 
-    @Override
-    public List<ScoreContribution> apply(ScoringContext context) {
-        BigDecimal consumed = context.measurements().require(metric).amount();
+    private List<ScoreContribution> contributionFor(BigDecimal consumed) {
         BigDecimal excess = consumed.subtract(allowance);
         if (excess.signum() <= 0) {
-            return List.of(new ScoreContribution(CODE,
+            return List.of(ScoreContribution.penalty(CODE,
                     "consumption %s within the allowance of %s".formatted(consumed.toPlainString(),
                             allowance.toPlainString()),
                     Points.ZERO));
@@ -38,6 +40,6 @@ public record ResourceScoringRule(MetricKey metric, BigDecimal allowance, Points
         Points deduction = pointsPerUnitOver.times(excess).negated();
         String explanation = "consumption %s exceeds the allowance of %s by %s"
                 .formatted(consumed.toPlainString(), allowance.toPlainString(), excess.toPlainString());
-        return List.of(new ScoreContribution(CODE, explanation, deduction));
+        return List.of(ScoreContribution.penalty(CODE, explanation, deduction));
     }
 }

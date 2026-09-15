@@ -18,11 +18,6 @@ public final class RequiredDocumentsRule implements EligibilityRule {
     }
 
     @Override
-    public String code() {
-        return CODE;
-    }
-
-    @Override
     public List<EligibilityViolation> evaluate(EligibilityRequest request) {
         Set<DocumentType> presented = request.registration().documentTypes();
         return requiredDocuments.stream()

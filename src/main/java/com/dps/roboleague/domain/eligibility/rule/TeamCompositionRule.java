@@ -27,11 +27,6 @@ public final class TeamCompositionRule implements EligibilityRule {
     }
 
     @Override
-    public String code() {
-        return CODE;
-    }
-
-    @Override
     public List<EligibilityViolation> evaluate(EligibilityRequest request) {
         List<EligibilityViolation> violations = new ArrayList<>();
         List<Member> competitors = request.registration().competitors();

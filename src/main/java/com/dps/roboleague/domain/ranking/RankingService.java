@@ -32,7 +32,7 @@ public final class RankingService {
         return comparator;
     }
 
-    private List<String> appliedTiebreaks(TeamScoreSummary previous, TeamScoreSummary current,
+    private List<AppliedTiebreak> appliedTiebreaks(TeamScoreSummary previous, TeamScoreSummary current,
             List<TiebreakRule> tiebreakRules) {
         if (previous == null || previous.totalPoints().compareTo(current.totalPoints()) != 0) {
             return List.of();
@@ -40,7 +40,7 @@ public final class RankingService {
         return tiebreakRules.stream()
                 .filter(rule -> rule.compare(previous, current) != 0)
                 .findFirst()
-                .map(rule -> List.of(rule.code()))
+                .map(rule -> List.of(AppliedTiebreak.of(rule)))
                 .orElse(List.of());
     }
 }

@@ -26,7 +26,7 @@ public final class CreateSeasonUseCase implements CreateSeason {
 
     @Override
     public SeasonId execute(Command command) {
-        SeasonId id = SeasonId.of(idGenerator.nextId("SEASON"));
+        SeasonId id = idGenerator.nextSeasonId();
         seasons.save(new Season(id, command.name(), command.year(), command.period()));
         auditLog.record(AuditEvent.of(clock.instant(), AuditAction.SEASON_CREATED, id.value(), command.actor()));
         return id;

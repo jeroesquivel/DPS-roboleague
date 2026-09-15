@@ -4,11 +4,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Detectar que una pista, un equipo o un juez ya están ocupados exige mirar turnos de varias rondas,
+ * así que la regla no pertenece a ninguna entidad.
+ */
 public final class ScheduleConflictDetector {
-
-    public static final String ARENA_BUSY = "ARENA_BUSY";
-    public static final String TEAM_BUSY = "TEAM_BUSY";
-    public static final String JUDGE_BUSY = "JUDGE_BUSY";
 
     public List<ScheduleConflict> detect(Collection<Heat> scheduled, Heat candidate) {
         List<ScheduleConflict> conflicts = new ArrayList<>();
@@ -17,15 +17,15 @@ public final class ScheduleConflictDetector {
                 continue;
             }
             if (heat.arenaId().equals(candidate.arenaId())) {
-                conflicts.add(new ScheduleConflict(ARENA_BUSY,
+                conflicts.add(new ScheduleConflict(ScheduleConflictType.ARENA_BUSY,
                         "arena " + candidate.arenaId().value() + " is taken by heat " + heat.id().value()));
             }
             if (heat.teamId().equals(candidate.teamId())) {
-                conflicts.add(new ScheduleConflict(TEAM_BUSY,
+                conflicts.add(new ScheduleConflict(ScheduleConflictType.TEAM_BUSY,
                         "team " + candidate.teamId().value() + " is already running in heat " + heat.id().value()));
             }
             if (heat.sharesJudgeWith(candidate)) {
-                conflicts.add(new ScheduleConflict(JUDGE_BUSY,
+                conflicts.add(new ScheduleConflict(ScheduleConflictType.JUDGE_BUSY,
                         "a judge is already assigned to heat " + heat.id().value()));
             }
         }

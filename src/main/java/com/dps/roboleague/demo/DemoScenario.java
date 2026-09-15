@@ -15,6 +15,8 @@ import com.dps.roboleague.application.port.in.SubmitAppeal;
 import com.dps.roboleague.domain.challenge.MeasurementSet;
 import com.dps.roboleague.domain.challenge.MetricValue;
 import com.dps.roboleague.domain.competition.RobotClass;
+import com.dps.roboleague.domain.ranking.AppliedTiebreak;
+import com.dps.roboleague.domain.ranking.StandingEntry;
 import com.dps.roboleague.domain.ranking.Standings;
 import com.dps.roboleague.domain.scoring.IncidentReport;
 import com.dps.roboleague.domain.scoring.JudgeEvaluation;
@@ -37,7 +39,7 @@ import com.dps.roboleague.domain.team.Member;
 import com.dps.roboleague.domain.team.MemberRole;
 import com.dps.roboleague.domain.team.Robot;
 import com.dps.roboleague.domain.team.TeamDocument;
-import com.dps.roboleague.infrastructure.config.RoboLeagueModule;
+import com.dps.roboleague.infrastructure.config.RoboLeagueCompositionRoot;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -45,39 +47,41 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * Walks one edition through every use case and prints the explainable score, the published
- * standings and the effect of an accepted appeal.
+ * Recorre una edición completa a través de los casos de uso e imprime el puntaje explicable, las
+ * posiciones publicadas y el efecto de una apelación aceptada. Sólo habla con puertos de entrada.
  */
 public final class DemoScenario {
 
     private static final String ORGANISER = "organiser";
     private static final RobotClass RESCUE_BOT = RobotClass.of("RESCUE_BOT");
 
-    private final RoboLeagueModule module;
+    private final RoboLeagueCompositionRoot module;
 
-    public DemoScenario(RoboLeagueModule module) {
+    public DemoScenario(RoboLeagueCompositionRoot module) {
         this.module = module;
     }
 
     public void run() {
-        SeasonId seasonId = module.createSeason().execute(new CreateSeason.Command("Season 2026", 2026,
+        SeasonId seasonId = module.createSeasonUseCase().execute(new CreateSeason.Command("Season 2026", 2026,
                 DateRange.of(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)), ORGANISER));
-        CompetitionId competitionId = module.createCompetition().execute(new CreateCompetition.Command(seasonId,
-                "National Open", DateRange.of(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 5)),
-                List.of(new CreateCompetition.CategoryDraft("Junior", AgeRange.between(12, 17), RESCUE_BOT)),
-                ORGANISER));
-        CategoryId categoryId = module.competitions().findById(competitionId).orElseThrow().categories()
-                .getFirst().id();
-        module.publishRulebook().execute(new PublishRulebook.Command(competitionId,
+        CreateCompetition.Result competition = module.createCompetitionUseCase()
+                .execute(new CreateCompetition.Command(seasonId, "National Open",
+                        DateRange.of(LocalDate.of(2026, 3, 1), LocalDate.of(2026, 3, 5)),
+                        List.of(new CreateCompetition.CategoryDraft("Junior", AgeRange.between(12, 17), RESCUE_BOT)),
+                        ORGANISER));
+        CompetitionId competitionId = competition.competitionId();
+        CategoryId categoryId = competition.firstCategory();
+        module.publishRulebookUseCase().execute(new PublishRulebook.Command(competitionId,
                 List.of(DemoRulebook.rescueChallenge()), DemoRulebook.eligibilityPolicy(), DemoRulebook.tiebreaks(),
                 ORGANISER));
 
         TeamId delta = register(competitionId, categoryId, "Delta Bots");
         TeamId omega = register(competitionId, categoryId, "Omega Crew");
-        RoundId roundId = module.scheduleRound().execute(new ScheduleRound.Command(competitionId, categoryId,
+        RoundId roundId = module.scheduleRoundUseCase().execute(new ScheduleRound.Command(competitionId, categoryId,
                 DemoRulebook.CHALLENGE_ID, 1,
                 List.of(heat(delta, "A1", LocalDateTime.of(2026, 3, 2, 10, 0)),
                         heat(omega, "A1", LocalDateTime.of(2026, 3, 2, 10, 20))),
@@ -86,14 +90,14 @@ public final class DemoScenario {
         RunId deltaRun = capture(roundId, delta, "95.5", 4, "42", List.of(8, 9), List.of());
         capture(roundId, omega, "105", 5, "55", List.of(7, 7), List.of(IncidentReport.once(DemoRulebook.RESTART)));
 
-        printScore(module.calculateRunScore().execute(new CalculateRunScore.Command(deltaRun)));
-        module.generateStandings().execute(new GenerateStandings.Command(competitionId, categoryId, ORGANISER));
+        printScore(module.calculateRunScoreUseCase().execute(new CalculateRunScore.Command(deltaRun)));
+        module.generateStandingsUseCase().execute(new GenerateStandings.Command(competitionId, categoryId, ORGANISER));
         printStandings("Published standings",
-                module.publishStandings().execute(new PublishStandings.Command(competitionId, categoryId, ORGANISER)));
+                module.publishStandingsUseCase().execute(new PublishStandings.Command(competitionId, categoryId, ORGANISER)));
 
         acceptAppeal(deltaRun, delta);
         printStandings("Standings after the accepted appeal",
-                module.recalculateStandings().execute(new RecalculateStandings.Command(competitionId, categoryId,
+                module.recalculateStandingsUseCase().execute(new RecalculateStandings.Command(competitionId, categoryId,
                         "objective granted on appeal", "head-judge")));
     }
 
@@ -107,7 +111,7 @@ public final class DemoScenario {
         List<TeamDocument> documents = List.of(
                 new TeamDocument(DocumentType.PARENTAL_CONSENT, "PC-" + teamName),
                 new TeamDocument(DocumentType.TECHNICAL_SHEET, "TS-" + teamName));
-        RegisterTeam.Outcome outcome = module.registerTeam().execute(new RegisterTeam.Command(competitionId,
+        RegisterTeam.Outcome outcome = module.registerTeamUseCase().execute(new RegisterTeam.Command(competitionId,
                 categoryId, teamName, members, robot, documents, ORGANISER));
         System.out.println("Registered " + teamName + " as " + outcome.status());
         return outcome.teamId();
@@ -124,7 +128,7 @@ public final class DemoScenario {
                 .mapToObj(index -> new JudgeEvaluation(JudgeId.of("J" + (index + 1)), DemoRulebook.DESIGN,
                         Points.of(judgeScores.get(index).longValue())))
                 .toList();
-        return module.captureRunResult().execute(new CaptureRunResult.Command(roundId, teamId, 1,
+        return module.captureRunResultUseCase().execute(new CaptureRunResult.Command(roundId, teamId, 1,
                 measurements(seconds, objectives, energy), evaluations, incidents, "scorekeeper"));
     }
 
@@ -136,9 +140,9 @@ public final class DemoScenario {
     }
 
     private void acceptAppeal(RunId runId, TeamId teamId) {
-        AppealId appealId = module.submitAppeal().execute(new SubmitAppeal.Command(runId, teamId,
+        AppealId appealId = module.submitAppealUseCase().execute(new SubmitAppeal.Command(runId, teamId,
                 "the fourth objective was completed before the buzzer", "delta-captain"));
-        module.resolveAppeal().execute(new ResolveAppeal.Command(appealId, true, "head-judge",
+        module.resolveAppealUseCase().execute(new ResolveAppeal.Command(appealId, true, "head-judge",
                 "the video review confirms the objective",
                 Optional.of(new ResolveAppeal.Correction(measurements("95.5", 5, "42"), List.of())), "head-judge"));
     }
@@ -155,6 +159,12 @@ public final class DemoScenario {
         System.out.println();
         System.out.println(title + " (revision " + standings.revision() + ", " + standings.status() + ")");
         standings.entries().forEach(entry -> System.out.printf("  %d. %-12s %8s %s%n", entry.position(),
-                entry.teamId().value(), entry.totalPoints(), entry.appliedTiebreaks()));
+                entry.teamId().value(), entry.totalPoints(), tiebreaksOf(entry)));
+    }
+
+    private String tiebreaksOf(StandingEntry entry) {
+        return entry.appliedTiebreaks().stream()
+                .map(AppliedTiebreak::description)
+                .collect(Collectors.joining(", ", "(", ")"));
     }
 }

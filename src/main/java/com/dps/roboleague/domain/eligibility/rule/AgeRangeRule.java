@@ -12,11 +12,6 @@ public final class AgeRangeRule implements EligibilityRule {
     public static final String CODE = "AGE_RANGE";
 
     @Override
-    public String code() {
-        return CODE;
-    }
-
-    @Override
     public List<EligibilityViolation> evaluate(EligibilityRequest request) {
         AgeRange range = request.category().ageRange();
         return request.registration().competitors().stream()

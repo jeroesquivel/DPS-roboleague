@@ -4,6 +4,7 @@ import com.dps.roboleague.domain.challenge.MetricKey;
 import com.dps.roboleague.domain.scoring.ScoreContribution;
 import com.dps.roboleague.domain.scoring.ScoringContext;
 import com.dps.roboleague.domain.scoring.ScoringRule;
+import com.dps.roboleague.domain.scoring.ScoringRuleCode;
 import com.dps.roboleague.domain.shared.Points;
 import java.math.BigDecimal;
 import java.util.List;
@@ -12,11 +13,23 @@ import java.util.Objects;
 public record ThresholdBonusRule(MetricKey metric, Comparison comparison, BigDecimal threshold, Points bonus)
         implements ScoringRule {
 
-    public static final String CODE = "BONUS";
+    public static final ScoringRuleCode CODE = ScoringRuleCode.of("BONUS");
 
     public enum Comparison {
-        AT_LEAST,
-        AT_MOST
+
+        AT_LEAST("at least"),
+        AT_MOST("at most");
+
+        private final String label;
+
+        Comparison(String label) {
+            this.label = label;
+        }
+
+        /** Texto legible para la explicación que ve un juez o un equipo. */
+        public String label() {
+            return label;
+        }
     }
 
     public ThresholdBonusRule {
@@ -27,19 +40,22 @@ public record ThresholdBonusRule(MetricKey metric, Comparison comparison, BigDec
     }
 
     @Override
-    public String code() {
-        return CODE;
+    public List<ScoreContribution> apply(ScoringContext context) {
+        return context.measurements().amountOf(metric)
+                .map(this::contributionFor)
+                .orElseGet(() -> List.of(ScoreContribution.bonus(CODE,
+                        "no measurement recorded for %s: bonus not granted".formatted(metric.value()),
+                        Points.ZERO)));
     }
 
-    @Override
-    public List<ScoreContribution> apply(ScoringContext context) {
-        BigDecimal measured = context.measurements().require(metric).amount();
+    private List<ScoreContribution> contributionFor(BigDecimal measured) {
         boolean granted = switch (comparison) {
             case AT_LEAST -> measured.compareTo(threshold) >= 0;
             case AT_MOST -> measured.compareTo(threshold) <= 0;
         };
-        String explanation = "%s %s %s: bonus %s".formatted(metric.value(), comparison, threshold.toPlainString(),
+        String explanation = "%s %s %s %s: bonus %s".formatted(metric.value(), measured.toPlainString(),
+                granted ? "is" : "is not", comparison.label() + " " + threshold.toPlainString(),
                 granted ? "granted" : "not granted");
-        return List.of(new ScoreContribution(CODE, explanation, granted ? bonus : Points.ZERO));
+        return List.of(ScoreContribution.bonus(CODE, explanation, granted ? bonus : Points.ZERO));
     }
 }

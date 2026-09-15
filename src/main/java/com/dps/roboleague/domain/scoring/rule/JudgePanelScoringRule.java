@@ -5,6 +5,7 @@ import com.dps.roboleague.domain.scoring.JudgeEvaluation;
 import com.dps.roboleague.domain.scoring.ScoreContribution;
 import com.dps.roboleague.domain.scoring.ScoringContext;
 import com.dps.roboleague.domain.scoring.ScoringRule;
+import com.dps.roboleague.domain.scoring.ScoringRuleCode;
 import com.dps.roboleague.domain.shared.Points;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -13,7 +14,7 @@ import java.util.Objects;
 
 public record JudgePanelScoringRule(MetricKey criterion, BigDecimal weight) implements ScoringRule {
 
-    public static final String CODE = "JUDGES";
+    public static final ScoringRuleCode CODE = ScoringRuleCode.of("JUDGES");
 
     public JudgePanelScoringRule {
         Objects.requireNonNull(criterion, "criterion is required");
@@ -21,15 +22,10 @@ public record JudgePanelScoringRule(MetricKey criterion, BigDecimal weight) impl
     }
 
     @Override
-    public String code() {
-        return CODE;
-    }
-
-    @Override
     public List<ScoreContribution> apply(ScoringContext context) {
         List<JudgeEvaluation> evaluations = context.evaluationsFor(criterion);
         if (evaluations.isEmpty()) {
-            return List.of(new ScoreContribution(CODE,
+            return List.of(ScoreContribution.earned(CODE,
                     "no evaluations recorded for criterion " + criterion.value(), Points.ZERO));
         }
         BigDecimal sum = evaluations.stream()
@@ -39,6 +35,6 @@ public record JudgePanelScoringRule(MetricKey criterion, BigDecimal weight) impl
         Points earned = Points.of(average).times(weight);
         String explanation = "average of %d evaluations for %s is %s weighted by %s".formatted(evaluations.size(),
                 criterion.value(), average.toPlainString(), weight.toPlainString());
-        return List.of(new ScoreContribution(CODE, explanation, earned));
+        return List.of(ScoreContribution.earned(CODE, explanation, earned));
     }
 }

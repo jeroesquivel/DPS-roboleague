@@ -20,6 +20,7 @@ public final class InMemoryStandingsRepository implements StandingsRepository {
 
     @Override
     public void save(Standings standings) {
+        // Upsert por revisión, según el contrato declarado en StandingsRepository.
         List<Standings> history = revisions.computeIfAbsent(
                 new Key(standings.competitionId(), standings.categoryId()), key -> new ArrayList<>());
         history.removeIf(existing -> existing.revision() == standings.revision());
@@ -33,6 +34,8 @@ public final class InMemoryStandingsRepository implements StandingsRepository {
 
     @Override
     public List<Standings> findHistory(CompetitionId competitionId, CategoryId categoryId) {
-        return List.copyOf(revisions.getOrDefault(new Key(competitionId, categoryId), List.of()));
+        return revisions.getOrDefault(new Key(competitionId, categoryId), List.of()).stream()
+                .sorted(Comparator.comparingInt(Standings::revision))
+                .toList();
     }
 }

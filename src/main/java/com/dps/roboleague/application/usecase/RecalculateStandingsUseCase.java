@@ -5,7 +5,7 @@ import com.dps.roboleague.application.port.in.RecalculateStandings;
 import com.dps.roboleague.application.port.out.AuditLog;
 import com.dps.roboleague.application.port.out.RulebookRepository;
 import com.dps.roboleague.application.port.out.StandingsRepository;
-import com.dps.roboleague.application.service.CategoryScoreCollector;
+import com.dps.roboleague.application.service.CategoryScoringService;
 import com.dps.roboleague.domain.audit.AuditAction;
 import com.dps.roboleague.domain.audit.AuditEvent;
 import com.dps.roboleague.domain.ranking.RankingService;
@@ -20,16 +20,16 @@ public final class RecalculateStandingsUseCase implements RecalculateStandings {
 
     private final StandingsRepository standings;
     private final RulebookRepository rulebooks;
-    private final CategoryScoreCollector scoreCollector;
+    private final CategoryScoringService scoringService;
     private final RankingService rankingService;
     private final AuditLog auditLog;
     private final Clock clock;
 
     public RecalculateStandingsUseCase(StandingsRepository standings, RulebookRepository rulebooks,
-            CategoryScoreCollector scoreCollector, RankingService rankingService, AuditLog auditLog, Clock clock) {
+            CategoryScoringService scoringService, RankingService rankingService, AuditLog auditLog, Clock clock) {
         this.standings = standings;
         this.rulebooks = rulebooks;
-        this.scoreCollector = scoreCollector;
+        this.scoringService = scoringService;
         this.rankingService = rankingService;
         this.auditLog = auditLog;
         this.clock = clock;
@@ -43,7 +43,7 @@ public final class RecalculateStandingsUseCase implements RecalculateStandings {
                 .orElseThrow(() -> NotFoundException.of("Rulebook", current.rulebookVersion().toString()));
 
         List<StandingEntry> entries = rankingService.rank(
-                scoreCollector.collect(command.competitionId(), command.categoryId()), rulebook.tiebreakRules());
+                scoringService.collect(command.competitionId(), command.categoryId()), rulebook.tiebreakRules());
         Standings recalculated = current.supersede(entries, clock.instant());
         standings.save(recalculated);
 
