@@ -15,7 +15,7 @@ aplicar junto con sus consecuencias.
 | Capa | Paquete | Contenido | Depende de |
 | --- | --- | --- | --- |
 | Dominio | `domain.*` | Entidades, value objects, reglas y servicios de dominio | Nada fuera del dominio y del JDK |
-| Aplicación | `application.*` | Casos de uso y contratos (`port.in`, `port.out`) | Dominio |
+| Aplicación | `application.*` | Casos de uso y contratos | Dominio |
 | Detalles | `infrastructure.*`, `demo`, `Main` | Adaptadores en memoria, composition root y ejecución de ejemplo | Aplicación y dominio |
 
 El dominio no importa ninguna clase de `application` ni de `infrastructure`: la dirección de las
@@ -48,7 +48,7 @@ la operación con su contrato de entrada y evita una explosión de DTOs sueltos.
 Leer también es un caso de uso: `FindCompetition`, `FindRunResult`, `FindRound`,
 `FindTeamRegistration`, `FindAppeal`, `GetStandings` y `FindAuditTrail` son puertos de entrada como
 cualquier otro. Sin ellos, quien maneja la aplicación termina yendo al repositorio por su cuenta,
-que es exactamente el cruce de frontera que esta arquitectura existe para impedir.
+que es exactamente el cruce de frontera que evita esta arquitectura.
 
 **Por qué los de consulta también:** el ejecutable de ejemplo y los tests son adaptadores de
 entrada. Si pueden alcanzar un `CompetitionRepository`, el controller REST de la entrega 2 va a
