@@ -16,7 +16,7 @@ import com.dps.roboleague.domain.ranking.rule.FewestPenaltiesTiebreak;
 import com.dps.roboleague.domain.ranking.rule.HighestSingleRunTiebreak;
 import com.dps.roboleague.domain.scoring.PenaltyCode;
 import com.dps.roboleague.domain.scoring.PenaltyDefinition;
-import com.dps.roboleague.domain.scoring.rule.CompositeScoringRule;
+import com.dps.roboleague.domain.scoring.ScoringRule;
 import com.dps.roboleague.domain.scoring.rule.JudgePanelScoringRule;
 import com.dps.roboleague.domain.scoring.rule.ObjectiveScoringRule;
 import com.dps.roboleague.domain.scoring.rule.ResourceScoringRule;
@@ -51,11 +51,11 @@ final class DemoRulebook {
                 MetricDefinition.required(OBJECTIVES, MetricKind.OBJECTIVE_COUNT, "objectives"),
                 MetricDefinition.required(ENERGY, MetricKind.RESOURCE_UNITS, "mAh"),
                 MetricDefinition.optional(DESIGN, MetricKind.JUDGE_CRITERION, "points"));
-        return new ChallengeSpec(CHALLENGE_ID, "Rescue mission", metrics, scoringRule(), penalties(), 2);
+        return new ChallengeSpec(CHALLENGE_ID, "Rescue mission", metrics, scoringRules(), penalties(), 2);
     }
 
-    static CompositeScoringRule scoringRule() {
-        return CompositeScoringRule.of(
+    static List<ScoringRule> scoringRules() {
+        return List.of(
                 new TimeScoringRule(TIME, Duration.ofSeconds(120), Points.of("0.50"), Points.of(30)),
                 new ObjectiveScoringRule(OBJECTIVES, Points.of(10), 5),
                 new JudgePanelScoringRule(DESIGN, BigDecimal.ONE),

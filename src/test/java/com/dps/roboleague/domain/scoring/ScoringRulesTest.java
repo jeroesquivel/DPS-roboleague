@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.dps.roboleague.domain.challenge.MeasurementSet;
 import com.dps.roboleague.domain.challenge.MetricKey;
 import com.dps.roboleague.domain.challenge.MetricValue;
-import com.dps.roboleague.domain.scoring.rule.CompositeScoringRule;
 import com.dps.roboleague.domain.scoring.rule.JudgePanelScoringRule;
 import com.dps.roboleague.domain.scoring.rule.ObjectiveScoringRule;
 import com.dps.roboleague.domain.scoring.rule.PenaltyScoringRule;
@@ -105,40 +104,9 @@ class ScoringRulesTest {
         assertEquals(Points.ZERO, rule.breakdownFor(measured(OBJECTIVES, "4")).total());
     }
 
-    @Test
-    void compositeRuleKeepsOneContributionPerRuleAndAddsThemUp() {
-        CompositeScoringRule rule = CompositeScoringRule.of(
-                new TimeScoringRule(TIME, Duration.ofSeconds(120), Points.of("0.50"), Points.of(30)),
-                new ObjectiveScoringRule(OBJECTIVES, Points.of(10), 5),
-                PenaltyScoringRule.of(List.of(new PenaltyDefinition(RESTART, "manual restart", Points.of(3)))));
-        ScoringContext context = new ScoringContext(
-                MeasurementSet.empty().with(TIME, MetricValue.of("95.5")).with(OBJECTIVES, MetricValue.of(4)),
-                List.of(), List.of(IncidentReport.once(RESTART)));
-
-        ScoreBreakdown breakdown = rule.breakdownFor(context);
-
-        assertEquals(3, breakdown.contributions().size());
-        assertEquals(Points.of("-3.00"), breakdown.totalOf(ContributionKind.PENALTY));
-        assertEquals(Points.of("49.25"), breakdown.total());
-    }
-
-    @Test
-    void theBreakdownSeparatesWhatWasEarnedFromBonusesAndPenalties() {
-        CompositeScoringRule rule = CompositeScoringRule.of(
-                new ObjectiveScoringRule(OBJECTIVES, Points.of(10), 5),
-                new ThresholdBonusRule(OBJECTIVES, ThresholdBonusRule.Comparison.AT_LEAST, new BigDecimal("5"),
-                        Points.of(15)),
-                PenaltyScoringRule.of(List.of(new PenaltyDefinition(RESTART, "manual restart", Points.of(3)))));
-        ScoringContext context = new ScoringContext(MeasurementSet.empty().with(OBJECTIVES, MetricValue.of(5)),
-                List.of(), List.of(IncidentReport.once(RESTART)));
-
-        ScoreBreakdown breakdown = rule.breakdownFor(context);
-
-        assertEquals(Points.of("50.00"), breakdown.totalOf(ContributionKind.EARNED));
-        assertEquals(Points.of("15.00"), breakdown.totalOf(ContributionKind.BONUS));
-        assertEquals(Points.of("-3.00"), breakdown.totalOf(ContributionKind.PENALTY));
-        assertEquals(Points.of("62.00"), breakdown.total());
-    }
+    // Combinar varias reglas en un mismo puntaje es responsabilidad de ChallengeSpec, no de una
+    // ScoringRule compuesta: ver ChallengeSpecTest (scoreCombinesEveryScoringRuleWithThe...) y
+    // DESIGN.md 2.2/5.10.
 
     // --- el contrato que toda ScoringRule respeta (LSP) ---
 

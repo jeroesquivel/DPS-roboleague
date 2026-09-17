@@ -147,22 +147,24 @@ es cuando hay alguien mirando, y no al publicar posiciones.
 partimos: cinco reglas lanzaban, una explicaba y otra hacía las dos cosas); declarar una excepción
 chequeada en la firma, que traslada el problema al llamador sin unificar el significado.
 
-### 2.2 Combinación de criterios mediante Composite
+### 2.2 Un desafío conoce una lista de reglas, no una regla que a su vez es una lista
 
-**Patrón / principio:** Composite.
+**Patrón / principio:** simplicidad deliberada; se prefirió sobre Composite (ver 5.10).
 
-**Dónde:** `domain/scoring/rule/CompositeScoringRule`.
+**Dónde:** `ChallengeSpec.scoringRules` y `ChallengeSpec.score`.
 
-`CompositeScoringRule` implementa `ScoringRule` y contiene una lista de reglas, de modo que un
-desafío que combina factores se configura igual que uno simple: `ChallengeSpec` sólo conoce una
-`ScoringRule`. No tiene código propio ni nombre: un compuesto no aporta contribuciones, las delega, y
-cada contribución ya viene etiquetada por la regla que la produjo.
+`ChallengeSpec` guarda directamente una `List<ScoringRule>`. Al puntuar, `score` aplica cada
+regla de la lista, le suma las contribuciones de `PenaltyScoringRule.of(penalties)` (armada
+desde el catálogo del propio desafío, ver 2.4) y devuelve un único `ScoreBreakdown` con todo.
 
-**Por qué:** resuelve el requisito de "una combinación de factores" sin ningún caso especial y admite
-anidamiento (bloques de puntaje dentro de bloques).
+**Por qué:** el único lugar del sistema que necesita combinar varias `ScoringRule` es este
+método. Un `CompositeScoringRule` que envolviera la lista antes de dársela a `ChallengeSpec`
+no evitaba ninguna duplicación real, porque no había un segundo consumidor que repitiera esa
+lógica — y de hecho `ChallengeSpec.score` ya tenía que concatenar manualmente la salida de esa
+regla con la de `PenaltyScoringRule` para separar el catálogo de penalizaciones (2.4). Sacar el
+Composite intermedio deja un solo mecanismo de combinación en vez de dos.
 
-**Alternativas descartadas:** que `ChallengeSpec` tuviera una lista de reglas y las recorriera él
-mismo, lo que duplicaría la lógica de agregación en cada consumidor.
+**Alternativas descartadas:** ver 5.10 para la que se aplicaba antes.
 
 ### 2.3 Puntaje explicable: el resultado es un desglose, no un número
 
@@ -555,6 +557,24 @@ configuración externa o un DSL.
 despliegue, no un archivo de configuración. A cambio, las reglas son tipadas, testeables y depurables;
 un intérprete propio hubiera sido la parte más riesgosa del sistema. La interfaz `ScoringRule` deja la
 puerta abierta a agregar un adaptador que construya reglas desde datos.
+
+### 5.10 Composite explícito para combinar reglas de puntaje
+
+Se aplicó en un primer momento (`CompositeScoringRule`, ver versión anterior de 2.2) y se sacó
+después de la refactorización de 15b77aa: `ChallengeSpec` pasó a separar el catálogo de
+penalizaciones de la regla de puntaje principal (S2 en `REVIEW.md`), y desde ese momento
+`ChallengeSpec.score` ya combinaba dos fuentes de contribuciones a mano (`Stream.concat`)
+además de la que el Composite armaba. Mantener las dos formas de combinar reglas —una envuelta
+en una clase, otra manual— era la inconsistencia real, no el Composite en sí. Se resolvió
+haciendo que `ChallengeSpec` sostenga la lista de reglas directamente.
+
+**Consecuencia:** se pierde la posibilidad de anidar composites dentro de otros composites (un
+bloque de puntaje que agrupa a su vez otros bloques con su propio nombre). Ningún desafío de
+este dominio necesitó esa profundidad: una lista plana alcanza para expresar "una combinación
+de factores" tal como lo pide el enunciado. Si en el futuro un reglamento necesitara agrupar un
+subconjunto de reglas bajo un nombre propio, nada impide reintroducir una implementación de
+`ScoringRule` que envuelva una sublista — la interfaz no cambió, sólo dejó de ser obligatorio
+pasar por ella para combinar las reglas de un desafío.
 
 ### 5.8 Persistencia real, API REST y seguridad
 

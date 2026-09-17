@@ -97,7 +97,7 @@ public final class TestEdition {
     }
 
     public RulebookVersion publishRulebookWith(ScoringRule scoringRule) {
-        return publishRulebook(module, competitionId, RescueEditionFixture.challengeScoredBy(scoringRule));
+        return publishRulebook(module, competitionId, RescueEditionFixture.challengeScoredBy(List.of(scoringRule)));
     }
 
     private static RulebookVersion publishRulebook(RoboLeagueCompositionRoot module, CompetitionId competitionId,

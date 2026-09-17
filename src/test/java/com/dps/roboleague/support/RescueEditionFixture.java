@@ -17,7 +17,6 @@ import com.dps.roboleague.domain.ranking.rule.HighestSingleRunTiebreak;
 import com.dps.roboleague.domain.scoring.PenaltyCode;
 import com.dps.roboleague.domain.scoring.PenaltyDefinition;
 import com.dps.roboleague.domain.scoring.ScoringRule;
-import com.dps.roboleague.domain.scoring.rule.CompositeScoringRule;
 import com.dps.roboleague.domain.scoring.rule.JudgePanelScoringRule;
 import com.dps.roboleague.domain.scoring.rule.ObjectiveScoringRule;
 import com.dps.roboleague.domain.scoring.rule.ResourceScoringRule;
@@ -50,11 +49,11 @@ public final class RescueEditionFixture {
     }
 
     public static ChallengeSpec rescueChallenge() {
-        return challengeScoredBy(scoringRule());
+        return challengeScoredBy(scoringRules());
     }
 
-    public static ChallengeSpec challengeScoredBy(ScoringRule scoringRule) {
-        return new ChallengeSpec(CHALLENGE_ID, "Rescue mission", metrics(), scoringRule, penalties(), 2);
+    public static ChallengeSpec challengeScoredBy(List<ScoringRule> scoringRules) {
+        return new ChallengeSpec(CHALLENGE_ID, "Rescue mission", metrics(), scoringRules, penalties(), 2);
     }
 
     public static List<MetricDefinition> metrics() {
@@ -65,8 +64,8 @@ public final class RescueEditionFixture {
                 MetricDefinition.optional(DESIGN, MetricKind.JUDGE_CRITERION, "points"));
     }
 
-    public static ScoringRule scoringRule() {
-        return CompositeScoringRule.of(
+    public static List<ScoringRule> scoringRules() {
+        return List.of(
                 new TimeScoringRule(TIME, Duration.ofSeconds(120), Points.of("0.50"), Points.of(30)),
                 new ObjectiveScoringRule(OBJECTIVES, Points.of(10), 5),
                 new JudgePanelScoringRule(DESIGN, BigDecimal.ONE),
