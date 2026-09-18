@@ -65,6 +65,7 @@ public abstract class StandingsRepositoryContractTest {
 
         assertEquals(List.of(1, 2), repository.findHistory(COMPETITION, CATEGORY).stream()
                 .map(Standings::revision).toList());
+        assertEquals(second, repository.findLatest(COMPETITION, CATEGORY).orElseThrow());
     }
 
     @Test

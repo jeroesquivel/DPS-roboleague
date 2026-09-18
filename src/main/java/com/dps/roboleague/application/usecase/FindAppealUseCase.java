@@ -4,6 +4,7 @@ import com.dps.roboleague.application.NotFoundException;
 import com.dps.roboleague.application.port.in.FindAppeal;
 import com.dps.roboleague.application.port.out.AppealRepository;
 import com.dps.roboleague.domain.appeal.Appeal;
+import com.dps.roboleague.domain.shared.AppealId;
 
 public final class FindAppealUseCase implements FindAppeal {
 
@@ -14,8 +15,8 @@ public final class FindAppealUseCase implements FindAppeal {
     }
 
     @Override
-    public Appeal execute(Command command) {
-        return appeals.findById(command.appealId())
-                .orElseThrow(() -> NotFoundException.of("Appeal", command.appealId().value()));
+    public Appeal execute(AppealId appealId) {
+        return appeals.findById(appealId)
+                .orElseThrow(() -> NotFoundException.of("Appeal", appealId.value()));
     }
 }

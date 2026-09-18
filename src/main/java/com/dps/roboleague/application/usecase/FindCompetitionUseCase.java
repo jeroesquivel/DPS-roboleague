@@ -5,6 +5,7 @@ import com.dps.roboleague.application.port.in.FindCompetition;
 import com.dps.roboleague.application.port.out.CompetitionRepository;
 import com.dps.roboleague.domain.competition.Category;
 import com.dps.roboleague.domain.competition.Competition;
+import com.dps.roboleague.domain.shared.CompetitionId;
 
 public final class FindCompetitionUseCase implements FindCompetition {
 
@@ -15,9 +16,9 @@ public final class FindCompetitionUseCase implements FindCompetition {
     }
 
     @Override
-    public View execute(Command command) {
-        Competition competition = competitions.findById(command.competitionId())
-                .orElseThrow(() -> NotFoundException.of("Competition", command.competitionId().value()));
+    public View execute(CompetitionId competitionId) {
+        Competition competition = competitions.findById(competitionId)
+                .orElseThrow(() -> NotFoundException.of("Competition", competitionId.value()));
         return new View(competition.id(), competition.name(), competition.period(),
                 competition.activeRulebookVersion(),
                 competition.categories().stream().map(FindCompetitionUseCase::viewOf).toList());

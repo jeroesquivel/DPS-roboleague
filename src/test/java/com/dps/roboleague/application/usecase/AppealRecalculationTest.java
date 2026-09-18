@@ -109,7 +109,7 @@ class AppealRecalculationTest {
         RulebookVersion newVersion = edition.module().publishRulebookUseCase()
                 .execute(new PublishRulebook.Command(edition.competitionId(),
                         List.of(RescueEditionFixture.challengeScoredBy(
-                                new ObjectiveScoringRule(RescueEditionFixture.OBJECTIVES, Points.of(100), 5))),
+                                List.of(new ObjectiveScoringRule(RescueEditionFixture.OBJECTIVES, Points.of(100), 5)))),
                         RescueEditionFixture.eligibilityPolicy(),
                         List.of(new FastestMetricTiebreak(RescueEditionFixture.TIME)), TestEdition.ACTOR));
 

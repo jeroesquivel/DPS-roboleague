@@ -4,6 +4,7 @@ import com.dps.roboleague.application.NotFoundException;
 import com.dps.roboleague.application.port.in.FindRound;
 import com.dps.roboleague.application.port.out.RoundRepository;
 import com.dps.roboleague.domain.schedule.Round;
+import com.dps.roboleague.domain.shared.RoundId;
 
 public final class FindRoundUseCase implements FindRound {
 
@@ -14,8 +15,8 @@ public final class FindRoundUseCase implements FindRound {
     }
 
     @Override
-    public Round execute(Command command) {
-        return rounds.findById(command.roundId())
-                .orElseThrow(() -> NotFoundException.of("Round", command.roundId().value()));
+    public Round execute(RoundId roundId) {
+        return rounds.findById(roundId)
+                .orElseThrow(() -> NotFoundException.of("Round", roundId.value()));
     }
 }

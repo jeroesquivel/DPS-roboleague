@@ -5,8 +5,5 @@ import com.dps.roboleague.domain.team.TeamRegistration;
 
 public interface FindTeamRegistration {
 
-    TeamRegistration execute(Command command);
-
-    record Command(TeamId teamId) {
-    }
+    TeamRegistration execute(TeamId teamId);
 }

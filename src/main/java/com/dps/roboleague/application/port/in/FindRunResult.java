@@ -5,8 +5,5 @@ import com.dps.roboleague.domain.shared.RunId;
 
 public interface FindRunResult {
 
-    RunResult execute(Command command);
-
-    record Command(RunId runId) {
-    }
+    RunResult execute(RunId runId);
 }

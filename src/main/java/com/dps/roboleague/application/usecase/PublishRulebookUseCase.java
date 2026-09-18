@@ -38,12 +38,9 @@ public final class PublishRulebookUseCase implements PublishRulebook {
                 .map(rulebook -> rulebook.version().next())
                 .orElseGet(RulebookVersion::first);
 
-        Rulebook.Builder builder = Rulebook.builder(competition.id(), version, LocalDate.now(clock))
-                .withEligibilityPolicy(command.eligibilityPolicy());
-        command.challenges().forEach(builder::withChallenge);
-        command.tiebreakRules().forEach(builder::withTiebreak);
-
-        rulebooks.save(builder.build());
+        Rulebook rulebook = Rulebook.of(competition.id(), version, LocalDate.now(clock), command.challenges(),
+                command.eligibilityPolicy(), command.tiebreakRules());
+        rulebooks.save(rulebook);
         competition.activateRulebook(version);
         competitions.save(competition);
 

@@ -5,8 +5,5 @@ import com.dps.roboleague.domain.shared.AppealId;
 
 public interface FindAppeal {
 
-    Appeal execute(Command command);
-
-    record Command(AppealId appealId) {
-    }
+    Appeal execute(AppealId appealId);
 }

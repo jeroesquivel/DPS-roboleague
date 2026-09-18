@@ -18,7 +18,7 @@ class DemoScenarioTest {
 
         assertDoesNotThrow(() -> new DemoScenario(module).run());
 
-        List<AuditAction> actions = FindAuditTrail.actionsOf(
+        List<AuditAction> actions = TestEdition.actionsOf(
                 module.findAuditTrailUseCase().execute(new FindAuditTrail.Command("CATEGORY-1")));
         assertTrue(actions.containsAll(List.of(AuditAction.STANDINGS_GENERATED, AuditAction.STANDINGS_PUBLISHED,
                 AuditAction.STANDINGS_RECALCULATED)));

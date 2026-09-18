@@ -8,7 +8,6 @@ import com.dps.roboleague.application.NotFoundException;
 import com.dps.roboleague.application.port.in.CalculateRunScore;
 import com.dps.roboleague.application.port.in.CaptureRunResult;
 import com.dps.roboleague.application.port.in.FindAuditTrail;
-import com.dps.roboleague.application.port.in.FindCompetition;
 import com.dps.roboleague.application.port.in.PublishRulebook;
 import com.dps.roboleague.domain.audit.AuditAction;
 import com.dps.roboleague.domain.audit.AuditEvent;
@@ -25,7 +24,6 @@ import com.dps.roboleague.domain.scoring.ScoreContribution;
 import com.dps.roboleague.domain.scoring.ScoringContext;
 import com.dps.roboleague.domain.scoring.ScoringRule;
 import com.dps.roboleague.domain.scoring.ScoringRuleCode;
-import com.dps.roboleague.domain.scoring.rule.CompositeScoringRule;
 import com.dps.roboleague.domain.scoring.rule.ObjectiveScoringRule;
 import com.dps.roboleague.domain.scoring.rule.PrecisionScoringRule;
 import com.dps.roboleague.domain.scoring.rule.TimeScoringRule;
@@ -116,11 +114,11 @@ class RulebookEvolutionTest {
 
     @Test
     void aNewScoringRuleCanBeConfiguredAlongsideExistingRulesAndThePenaltyCatalog() {
-        ScoringRule extended = CompositeScoringRule.of(
+        List<ScoringRule> extended = List.of(
                 new SquaredObjectivesRule(RescueEditionFixture.OBJECTIVES, Points.of("2.50")),
                 new TimeScoringRule(RescueEditionFixture.TIME, Duration.ofSeconds(120), Points.of("0.50"),
                         Points.of(30)));
-        edition.publishRulebookWith(extended);
+        publish(edition.competitionId(), List.of(RescueEditionFixture.challengeScoredBy(extended)));
         RoundId secondRound = scheduleSecondRound();
 
         RunId run = edition.capture(secondRound, delta, "95.5", 4, "42", List.of(8, 9),
@@ -175,7 +173,7 @@ class RulebookEvolutionTest {
         List<MetricDefinition> metrics = new ArrayList<>(RescueEditionFixture.metrics());
         metrics.add(MetricDefinition.required(PRECISION, MetricKind.PRECISION_RATIO, "ratio"));
         return new ChallengeSpec(RescueEditionFixture.CHALLENGE_ID, "Rescue with precision", metrics,
-                new PrecisionScoringRule(PRECISION, Points.of(20)), RescueEditionFixture.penalties(), 2);
+                List.of(new PrecisionScoringRule(PRECISION, Points.of(20))), RescueEditionFixture.penalties(), 2);
     }
 
     private RulebookVersion publish(CompetitionId competitionId, List<ChallengeSpec> challenges) {
@@ -186,7 +184,7 @@ class RulebookEvolutionTest {
 
     private RulebookVersion activeVersion() {
         return edition.module().findCompetitionUseCase()
-                .execute(new FindCompetition.Command(edition.competitionId())).activeRulebookVersion().orElseThrow();
+                .execute(edition.competitionId()).activeRulebookVersion().orElseThrow();
     }
 
     private List<AuditEvent> publicationEvents() {

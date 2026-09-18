@@ -3,17 +3,14 @@ package com.dps.roboleague.support;
 import com.dps.roboleague.application.port.in.CaptureRunResult;
 import com.dps.roboleague.application.port.in.CreateCompetition;
 import com.dps.roboleague.application.port.in.CreateSeason;
-import com.dps.roboleague.application.port.in.FindAppeal;
 import com.dps.roboleague.application.port.in.FindAuditTrail;
-import com.dps.roboleague.application.port.in.FindRound;
-import com.dps.roboleague.application.port.in.FindRunResult;
-import com.dps.roboleague.application.port.in.FindTeamRegistration;
 import com.dps.roboleague.application.port.in.GetStandings;
 import com.dps.roboleague.application.port.in.PublishRulebook;
 import com.dps.roboleague.application.port.in.RegisterTeam;
 import com.dps.roboleague.application.port.in.ScheduleRound;
 import com.dps.roboleague.domain.appeal.Appeal;
 import com.dps.roboleague.domain.audit.AuditAction;
+import com.dps.roboleague.domain.audit.AuditEvent;
 import com.dps.roboleague.domain.challenge.ChallengeSpec;
 import com.dps.roboleague.domain.challenge.MeasurementSet;
 import com.dps.roboleague.domain.challenge.MetricValue;
@@ -152,19 +149,19 @@ public final class TestEdition {
 
 
     public RunResult runResult(RunId runId) {
-        return module.findRunResultUseCase().execute(new FindRunResult.Command(runId));
+        return module.findRunResultUseCase().execute(runId);
     }
 
     public TeamRegistration registration(TeamId teamId) {
-        return module.findTeamRegistrationUseCase().execute(new FindTeamRegistration.Command(teamId));
+        return module.findTeamRegistrationUseCase().execute(teamId);
     }
 
     public Round round(RoundId roundId) {
-        return module.findRoundUseCase().execute(new FindRound.Command(roundId));
+        return module.findRoundUseCase().execute(roundId);
     }
 
     public Appeal appeal(AppealId appealId) {
-        return module.findAppealUseCase().execute(new FindAppeal.Command(appealId));
+        return module.findAppealUseCase().execute(appealId);
     }
 
     public Standings latestStandings() {
@@ -176,8 +173,12 @@ public final class TestEdition {
     }
 
     public List<AuditAction> auditActionsFor(String subject) {
-        return FindAuditTrail.actionsOf(
+        return actionsOf(
                 module.findAuditTrailUseCase().execute(new FindAuditTrail.Command(subject)));
+    }
+
+    public static List<AuditAction> actionsOf(List<AuditEvent> events) {
+        return events.stream().map(AuditEvent::action).toList();
     }
 
     public RoboLeagueCompositionRoot module() {

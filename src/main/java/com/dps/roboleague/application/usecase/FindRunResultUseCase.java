@@ -4,6 +4,7 @@ import com.dps.roboleague.application.NotFoundException;
 import com.dps.roboleague.application.port.in.FindRunResult;
 import com.dps.roboleague.application.port.out.RunResultRepository;
 import com.dps.roboleague.domain.result.RunResult;
+import com.dps.roboleague.domain.shared.RunId;
 
 public final class FindRunResultUseCase implements FindRunResult {
 
@@ -14,8 +15,8 @@ public final class FindRunResultUseCase implements FindRunResult {
     }
 
     @Override
-    public RunResult execute(Command command) {
-        return runResults.findById(command.runId())
-                .orElseThrow(() -> NotFoundException.of("RunResult", command.runId().value()));
+    public RunResult execute(RunId runId) {
+        return runResults.findById(runId)
+                .orElseThrow(() -> NotFoundException.of("RunResult", runId.value()));
     }
 }

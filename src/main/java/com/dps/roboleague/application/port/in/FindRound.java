@@ -5,8 +5,5 @@ import com.dps.roboleague.domain.shared.RoundId;
 
 public interface FindRound {
 
-    Round execute(Command command);
-
-    record Command(RoundId roundId) {
-    }
+    Round execute(RoundId roundId);
 }

@@ -7,7 +7,6 @@ import com.dps.roboleague.domain.shared.ChallengeId;
 import com.dps.roboleague.domain.shared.CompetitionId;
 import com.dps.roboleague.domain.shared.DomainException;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +28,13 @@ public record Rulebook(CompetitionId competitionId, RulebookVersion version, Loc
         }
     }
 
-    public static Builder builder(CompetitionId competitionId, RulebookVersion version, LocalDate publishedOn) {
-        return new Builder(competitionId, version, publishedOn);
+    public static Rulebook of(CompetitionId competitionId, RulebookVersion version, LocalDate publishedOn,
+            List<ChallengeSpec> challenges, EligibilityPolicy eligibilityPolicy, List<TiebreakRule> tiebreakRules) {
+        Map<ChallengeId, ChallengeSpec> indexed = new LinkedHashMap<>();
+        for (ChallengeSpec challenge : challenges) {
+            indexed.put(challenge.id(), challenge);
+        }
+        return new Rulebook(competitionId, version, publishedOn, indexed, eligibilityPolicy, tiebreakRules);
     }
 
     public ChallengeSpec challenge(ChallengeId challengeId) {
@@ -39,40 +43,5 @@ public record Rulebook(CompetitionId competitionId, RulebookVersion version, Loc
             throw new DomainException("challenge " + challengeId.value() + " is not defined in rulebook " + version);
         }
         return spec;
-    }
-
-    public static final class Builder {
-
-        private final CompetitionId competitionId;
-        private final RulebookVersion version;
-        private final LocalDate publishedOn;
-        private final Map<ChallengeId, ChallengeSpec> challenges = new LinkedHashMap<>();
-        private final List<TiebreakRule> tiebreakRules = new ArrayList<>();
-        private EligibilityPolicy eligibilityPolicy = EligibilityPolicy.of();
-
-        private Builder(CompetitionId competitionId, RulebookVersion version, LocalDate publishedOn) {
-            this.competitionId = competitionId;
-            this.version = version;
-            this.publishedOn = publishedOn;
-        }
-
-        public Builder withChallenge(ChallengeSpec spec) {
-            challenges.put(spec.id(), spec);
-            return this;
-        }
-
-        public Builder withEligibilityPolicy(EligibilityPolicy policy) {
-            this.eligibilityPolicy = policy;
-            return this;
-        }
-
-        public Builder withTiebreak(TiebreakRule rule) {
-            tiebreakRules.add(rule);
-            return this;
-        }
-
-        public Rulebook build() {
-            return new Rulebook(competitionId, version, publishedOn, challenges, eligibilityPolicy, tiebreakRules);
-        }
     }
 }

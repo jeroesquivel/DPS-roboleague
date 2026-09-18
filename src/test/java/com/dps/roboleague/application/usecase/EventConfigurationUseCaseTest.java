@@ -47,7 +47,7 @@ class EventConfigurationUseCaseTest {
 
         CreateCompetition.Result created = createCompetition(seasonId, competitionPeriod);
         FindCompetition.View competition = module.findCompetitionUseCase()
-                .execute(new FindCompetition.Command(created.competitionId()));
+                .execute(created.competitionId());
 
         assertEquals("National Open", competition.name());
         assertEquals(competitionPeriod, competition.period());
@@ -68,7 +68,7 @@ class EventConfigurationUseCaseTest {
         CreateCompetition.Result created = createCompetition(createSeason(), SEASON_PERIOD);
 
         FindCompetition.View competition = module.findCompetitionUseCase()
-                .execute(new FindCompetition.Command(created.competitionId()));
+                .execute(created.competitionId());
 
         assertEquals(SEASON_PERIOD, competition.period());
         assertCreationAudited(created.competitionId().value(), AuditAction.COMPETITION_CREATED);
@@ -80,7 +80,7 @@ class EventConfigurationUseCaseTest {
 
         CreateCompetition.Result created = createCompetition(createSeason(), singleDay);
         FindCompetition.View competition = module.findCompetitionUseCase()
-                .execute(new FindCompetition.Command(created.competitionId()));
+                .execute(created.competitionId());
 
         assertEquals(singleDay, competition.period());
         assertCreationAudited(created.competitionId().value(), AuditAction.COMPETITION_CREATED);

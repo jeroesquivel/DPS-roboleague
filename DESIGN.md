@@ -32,19 +32,22 @@ acople la lógica a repositorios concretos; y un único paquete plano, que no co
 entre negocio y detalles. Una arquitectura por capas también puede invertir sus dependencias:
 lo determinante es el acoplamiento efectivo, no el nombre de las capas.
 
-### 1.2 Casos de uso como puertos de entrada con comandos propios
+### 1.2 Casos de uso como puertos de entrada con entradas propias
 
 **Patrón / principio:** Ports & Adapters, Interface Segregation (ISP), Single Responsibility (SRP).
 
 **Dónde:** `application/port/in/*` (interfaces) y `application/usecase/*UseCase` (implementaciones).
 
-Cada caso de uso es una interfaz con un único método `execute` y un `record Command` anidado que
-transporta su entrada; por ejemplo `CaptureRunResult.Command`. La implementación vive aparte y es la
-única que conoce los repositorios.
+Cada caso de uso es una interfaz con un único método `execute`. Las operaciones con varias entradas
+las agrupan en un `record Command` anidado; por ejemplo `CaptureRunResult.Command`. Las búsquedas
+`FindCompetition`, `FindRunResult`, `FindRound`, `FindTeamRegistration` y `FindAppeal` reciben
+directamente su identificador tipado: `FindRunResult.execute(RunId)`. La implementación vive aparte
+y consulta los repositorios a través de puertos de salida.
 
 **Por qué:** un consumidor (mañana un controller REST) depende exclusivamente de la operación que
-necesita y no de un "servicio de competencias" con veinte métodos. El comando anidado mantiene junta
-la operación con su contrato de entrada y evita una explosión de DTOs sueltos.
+necesita. El comando anidado mantiene junta la operación con su contrato de entrada; recibir
+directamente un identificador evita un objeto intermedio que no agrega información ni validaciones.
+Ambas formas conservan el puerto de entrada y la separación de responsabilidades.
 
 Leer también es un caso de uso: `FindCompetition`, `FindRunResult`, `FindRound`,
 `FindTeamRegistration`, `FindAppeal`, `GetStandings` y `FindAuditTrail` son puertos de entrada como
@@ -55,10 +58,17 @@ que es exactamente el cruce de frontera que evita esta arquitectura.
 entrada. Si pueden alcanzar un `CompetitionRepository`, el controller REST de la entrega 2 va a
 copiar ese atajo y la capa de aplicación deja de ser el único camino al negocio.
 
-**Alternativas descartadas:** un `CompetitionService` con todos los métodos (viola ISP y SRP, y crece
-sin control); pasar muchos parámetros sueltos en vez de un comando (el comando agrupa la entrada,
-pero agregarle componentes también cambia su constructor y puede exigir adaptar clientes); exponer los repositorios desde el composition root para "leer rápido" en los tests,
-que es cómodo hasta que se convierte en la forma normal de leer.
+Los puertos de consulta contienen las operaciones y sus datos de salida. La transformación de
+eventos de auditoría a acciones, usada sólo por los tests, vive en `support/TestEdition.actionsOf`.
+`FindCompetition.View` expone sus categorías sin agregar un método para obtener la primera que
+ningún consumidor utilizaba.
+
+**Alternativas descartadas:** concentrar responsabilidades sin relación en un servicio y obligar a
+todos los consumidores a depender de sus operaciones. Tener varios métodos relacionados no viola
+SRP ni ISP por sí solo; aquí se eligieron contratos pequeños por operación. También se descartaron
+los comandos que sólo envolvían los identificadores de búsqueda, pasar muchos parámetros sueltos en
+operaciones complejas y exponer los repositorios desde el composition root. Un comando agrupa la
+entrada, pero agregarle componentes también cambia su constructor y puede exigir adaptar clientes.
 
 ### 1.3 Repositorios declarados por la aplicación e implementados afuera
 
@@ -70,8 +80,8 @@ Los puertos de salida están expresados en el lenguaje del negocio (`findLatest(
 categoryId)`) y devuelven agregados y `Optional`, nunca filas ni estructuras de base de datos.
 
 Cuando el contrato de un puerto incluye una regla de negocio —"publicar reemplaza la revisión
-provisional, las anteriores no se tocan"— esa regla se documenta en la interfaz y se verifica con un
-test de contrato abstracto, `StandingsRepositoryContractTest`, que todo adaptador hereda. Así la
+provisional, las anteriores no se tocan"— se verifica con un test de contrato abstracto,
+`StandingsRepositoryContractTest`, que todo adaptador de posiciones hereda. Así la
 política no queda escondida en el `save` de un adaptador concreto, donde una implementación con SQL
 podría reinterpretarla en silencio.
 
@@ -239,21 +249,26 @@ el total, lo que las dejaría fuera de la explicación y obligaría a un orden i
 
 ### 3.1 Reglamento inmutable y versionado
 
-**Patrón / principio:** Value Object inmutable, Builder.
+**Patrón / principio:** Value Object inmutable, fábrica estática.
 
-**Dónde:** `domain/rulebook/Rulebook`, `RulebookVersion` y `Rulebook.Builder`.
+**Dónde:** `domain/rulebook/Rulebook`, `RulebookVersion` y `Rulebook.of`.
 
 Un `Rulebook` reúne los desafíos, la política de elegibilidad y los criterios de desempate de una
 versión. Publicar un reglamento nunca modifica el anterior: `PublishRulebookUseCase` crea la versión
-siguiente y `Competition.activateRulebook` sólo acepta versiones que superen a la vigente. Como el
-reglamento tiene seis componentes y se arma por partes, se expone un `Builder`.
+siguiente y `Competition.activateRulebook` sólo acepta versiones que superen a la vigente.
+`PublishRulebookUseCase` ya recibe todos los componentes juntos y los pasa a `Rulebook.of`, que
+indexa los desafíos por identificador y construye el reglamento. Si un identificador se repite,
+conserva el último desafío recibido, igual que la implementación anterior. El constructor mantiene
+las validaciones y las copias defensivas del mapa de desafíos y la lista de desempates.
 
 **Por qué:** el enunciado exige poder recalcular resultados con exactamente la versión de reglas
-correspondiente. Eso sólo es confiable si las versiones publicadas son inmutables.
+correspondiente. Eso sólo es confiable si las versiones publicadas son inmutables. La fábrica
+conserva esa garantía y evita el estado intermedio del builder, cuyo único consumidor ya tenía
+todos los datos disponibles.
 
-**Alternativas descartadas:** un reglamento mutable con historial de cambios (cualquier corrección
-alteraría resultados ya publicados); guardar sólo la versión vigente (haría imposible el recálculo
-histórico).
+**Alternativas descartadas:** un builder para volver a reunir datos que ya llegan juntos; un
+reglamento mutable con historial de cambios (cualquier corrección alteraría resultados ya
+publicados); guardar sólo la versión vigente (haría imposible el recálculo histórico).
 
 ### 3.2 La versión de reglas se fija en la ronda y viaja con el resultado
 
@@ -289,8 +304,12 @@ después de una corrección" sin que una operación pise silenciosamente a la ot
 cada publicación.
 
 La política de revisiones —una fila por revisión, publicar reemplaza la provisional, las anteriores
-nunca se tocan— está declarada en el javadoc de `StandingsRepository` y verificada por
-`StandingsRepositoryContractTest`, no escondida en el `save` del adaptador en memoria.
+se conservan— se verifica con `StandingsRepositoryContractTest`. `InMemoryStandingsRepository`
+almacena un `TreeMap` por competencia y categoría, con el número de revisión como clave: `put`
+reemplaza la misma revisión, `lastEntry` obtiene la vigente y sus valores ya están ordenados para
+el historial. Las consultas devuelven listas inmutables copiadas del mapa. El contrato se mantiene
+aunque las revisiones se guarden fuera de orden, sin eliminar elementos de una lista ni ordenarla
+en cada lectura.
 
 **Alternativas descartadas:** una tabla mutable que se sobrescribe (pierde el histórico y no permite
 comparar antes y después de una apelación); publicar automáticamente tras generar (impide revisar el
