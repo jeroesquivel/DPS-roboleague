@@ -6,11 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.dps.roboleague.application.port.in.GenerateStandings;
+import com.dps.roboleague.application.port.in.PublishRulebook;
 import com.dps.roboleague.application.port.in.PublishStandings;
 import com.dps.roboleague.application.port.in.RecalculateStandings;
 import com.dps.roboleague.application.port.in.ResolveAppeal;
 import com.dps.roboleague.application.port.in.SubmitAppeal;
+import com.dps.roboleague.application.port.out.AppealRepository;
+import com.dps.roboleague.application.port.out.AuditLog;
 import com.dps.roboleague.support.RescueEditionFixture;
+import com.dps.roboleague.domain.appeal.Appeal;
 import com.dps.roboleague.domain.appeal.AppealStatus;
 import com.dps.roboleague.domain.audit.AuditAction;
 import com.dps.roboleague.domain.audit.AuditEvent;
@@ -18,19 +22,25 @@ import com.dps.roboleague.domain.challenge.MeasurementSet;
 import com.dps.roboleague.domain.challenge.MetricValue;
 import com.dps.roboleague.domain.ranking.StandingEntry;
 import com.dps.roboleague.domain.ranking.Standings;
+import com.dps.roboleague.domain.ranking.rule.FastestMetricTiebreak;
+import com.dps.roboleague.domain.ranking.rule.FewestPenaltiesTiebreak;
 import com.dps.roboleague.domain.result.ResultCorrection;
 import com.dps.roboleague.domain.result.RunResult;
 import com.dps.roboleague.domain.result.RunStatus;
 import com.dps.roboleague.domain.rulebook.RulebookVersion;
 import com.dps.roboleague.domain.scoring.IncidentReport;
 import com.dps.roboleague.domain.scoring.PenaltyCode;
+import com.dps.roboleague.domain.scoring.rule.ObjectiveScoringRule;
 import com.dps.roboleague.domain.shared.AppealId;
 import com.dps.roboleague.domain.shared.DomainException;
 import com.dps.roboleague.domain.shared.Points;
 import com.dps.roboleague.domain.shared.RoundId;
 import com.dps.roboleague.domain.shared.RunId;
 import com.dps.roboleague.domain.shared.TeamId;
+import com.dps.roboleague.infrastructure.id.SequentialIdGenerator;
+import com.dps.roboleague.infrastructure.memory.InMemoryRunResultRepository;
 import com.dps.roboleague.support.TestEdition;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,6 +99,97 @@ class AppealRecalculationTest {
         assertEquals(List.of(delta, omega), recalculated.entries().stream().map(StandingEntry::teamId).toList());
         assertEquals(Points.of("85.75"), recalculated.entryFor(delta).orElseThrow().totalPoints());
         assertEquals(2, edition.standingsHistory().size());
+    }
+
+    @Test
+    void aNewRulebookDoesNotReplaceHistoricalScoringOrStandingsTiebreaksDuringRecalculation() {
+        // Ambos quedan en 71,50. Delta pierde 2 puntos por consumo; Omega pierde 8 entre consumo y reinicio.
+        resolve(submitAppeal(), true, Optional.of(new ResolveAppeal.Correction(
+                edition.measurements("124", 5, "52"), List.of())));
+        RulebookVersion newVersion = edition.module().publishRulebookUseCase()
+                .execute(new PublishRulebook.Command(edition.competitionId(),
+                        List.of(RescueEditionFixture.challengeScoredBy(
+                                new ObjectiveScoringRule(RescueEditionFixture.OBJECTIVES, Points.of(100), 5))),
+                        RescueEditionFixture.eligibilityPolicy(),
+                        List.of(new FastestMetricTiebreak(RescueEditionFixture.TIME)), TestEdition.ACTOR));
+
+        Standings recalculated = edition.module().recalculateStandingsUseCase()
+                .execute(new RecalculateStandings.Command(edition.competitionId(), edition.categoryId(),
+                        "corrected measurements reviewed after a new rulebook was published", TestEdition.ACTOR));
+
+        assertEquals(RulebookVersion.of(2), newVersion);
+        assertEquals(RulebookVersion.first(), recalculated.rulebookVersion());
+        assertEquals(2, recalculated.revision());
+        assertFalse(recalculated.isFinal());
+        assertEquals(Points.of("71.50"), recalculated.entryFor(delta).orElseThrow().totalPoints());
+        assertEquals(Points.of("71.50"), recalculated.entryFor(omega).orElseThrow().totalPoints());
+        // El desempate nuevo por tiempo favorecería a Omega (105 s frente a 124 s).
+        assertEquals(List.of(delta, omega), recalculated.entries().stream().map(StandingEntry::teamId).toList());
+        assertEquals(FewestPenaltiesTiebreak.CODE,
+                recalculated.entryFor(omega).orElseThrow().appliedTiebreaks().getFirst().code());
+        Standings original = edition.standingsHistory().getFirst();
+        assertTrue(original.isFinal());
+        assertEquals(Points.of("60.75"), original.entryFor(delta).orElseThrow().totalPoints());
+    }
+
+    @Test
+    void anAppealFromAnotherTeamIsRejectedWithoutSavingOrAuditingIt() {
+        InMemoryRunResultRepository runs = new InMemoryRunResultRepository();
+        runs.save(edition.runResult(deltaRun));
+        List<Appeal> savedAppeals = new ArrayList<>();
+        List<AuditEvent> recordedEvents = new ArrayList<>();
+        AppealRepository appeals = new AppealRepository() {
+            @Override
+            public void save(Appeal appeal) {
+                savedAppeals.add(appeal);
+            }
+
+            @Override
+            public Optional<Appeal> findById(AppealId id) {
+                return savedAppeals.stream().filter(appeal -> appeal.id().equals(id)).findFirst();
+            }
+        };
+        AuditLog auditLog = new AuditLog() {
+            @Override
+            public void record(AuditEvent event) {
+                recordedEvents.add(event);
+            }
+
+            @Override
+            public List<AuditEvent> findBySubject(String subject) {
+                return recordedEvents.stream().filter(event -> event.subject().equals(subject)).toList();
+            }
+        };
+        SubmitAppeal submit = new SubmitAppealUseCase(runs, appeals, new SequentialIdGenerator(), auditLog,
+                TestEdition.fixedClock());
+
+        assertThrows(DomainException.class,
+                () -> submit.execute(new SubmitAppeal.Command(deltaRun, omega, "claim on another team's run",
+                        "omega-captain")));
+
+        assertTrue(savedAppeals.isEmpty());
+        assertTrue(recordedEvents.isEmpty());
+        assertEquals(RunStatus.CAPTURED, edition.runResult(deltaRun).status());
+    }
+
+    @Test
+    void acceptingAnAppealWithoutACorrectionRecordsTheDecisionWithoutChangingResultsOrStandings() {
+        AppealId appealId = submitAppeal();
+        Standings published = edition.latestStandings();
+
+        AppealStatus status = resolve(appealId, true, Optional.empty());
+
+        assertEquals(AppealStatus.ACCEPTED, status);
+        assertTrue(edition.appeal(appealId).decision().isPresent());
+        RunResult run = edition.runResult(deltaRun);
+        assertEquals(RunStatus.CAPTURED, run.status());
+        assertEquals(run.originalMeasurements(), run.currentMeasurements());
+        assertTrue(run.corrections().isEmpty());
+        assertEquals(published, edition.latestStandings());
+        assertEquals(1, edition.standingsHistory().size());
+        assertEquals(List.of(AuditAction.APPEAL_SUBMITTED, AuditAction.APPEAL_RESOLVED),
+                edition.auditActionsFor(appealId.value()));
+        assertEquals(List.of(AuditAction.RESULT_CAPTURED), edition.auditActionsFor(deltaRun.value()));
     }
 
     @Test

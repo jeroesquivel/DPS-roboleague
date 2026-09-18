@@ -74,6 +74,42 @@ class RankingServiceTest {
         assertTrue(standings.get(1).appliedTiebreaks().isEmpty());
     }
 
+    @Test
+    void usesTheFastestRecordedTimeWhenPointsAndPenaltiesRemainTied() {
+        TeamScoreSummary steady = summary("AAA", run("R1", "30", null, "85"), run("R2", "30", null, "90"));
+        TeamScoreSummary fastest = summary("ZZZ", run("R3", "30", null, "95"), run("R4", "30", null, "80"));
+
+        List<StandingEntry> standings = rankingService.rank(List.of(steady, fastest), TIEBREAKS);
+
+        assertEquals(List.of("ZZZ", "AAA"), teamsOf(standings));
+        assertEquals(List.of(1, 2), positionsOf(standings));
+        assertEquals(List.of(FastestMetricTiebreak.CODE), codesOf(standings.get(1)));
+    }
+
+    @Test
+    void aTeamWithATimeMeasurementRanksAheadOfOneWithoutIt() {
+        TeamScoreSummary missingTime = summary("AAA", run("R1", "60", null, null));
+        TeamScoreSummary measured = summary("ZZZ", run("R2", "60", null, "90"));
+
+        List<StandingEntry> standings = rankingService.rank(List.of(missingTime, measured), TIEBREAKS);
+
+        assertEquals(List.of("ZZZ", "AAA"), teamsOf(standings));
+        assertEquals(List.of(1, 2), positionsOf(standings));
+        assertEquals(List.of(FastestMetricTiebreak.CODE), codesOf(standings.get(1)));
+    }
+
+    @Test
+    void teamsWithoutTimeMeasurementsStillShareTheirPositionWhenOtherwiseTied() {
+        TeamScoreSummary second = summary("BBB", run("R2", "60", null, null));
+        TeamScoreSummary first = summary("AAA", run("R1", "60", null, null));
+
+        List<StandingEntry> standings = rankingService.rank(List.of(second, first), TIEBREAKS);
+
+        assertEquals(List.of("AAA", "BBB"), teamsOf(standings));
+        assertEquals(List.of(1, 1), positionsOf(standings));
+        assertTrue(standings.stream().allMatch(entry -> entry.appliedTiebreaks().isEmpty()));
+    }
+
     private TeamScoreSummary summary(String teamId, ScoredRun... runs) {
         return new TeamScoreSummary(TeamId.of(teamId), List.of(runs));
     }
@@ -86,8 +122,11 @@ class RankingServiceTest {
             contributions.add(ScoreContribution.penalty(ScoringRuleCode.of("CHALLENGE"), "penalty",
                     Points.of(penaltyPoints)));
         }
-        return new ScoredRun(RunId.of(runId), ChallengeId.of("RESCUE"),
-                MeasurementSet.empty().with(TIME, MetricValue.of(seconds)), new ScoreBreakdown(contributions));
+        MeasurementSet measurements = seconds == null
+                ? MeasurementSet.empty()
+                : MeasurementSet.empty().with(TIME, MetricValue.of(seconds));
+        return new ScoredRun(RunId.of(runId), ChallengeId.of("RESCUE"), measurements,
+                new ScoreBreakdown(contributions));
     }
 
     private List<String> codesOf(StandingEntry entry) {

@@ -75,6 +75,27 @@ public abstract class StandingsRepositoryContractTest {
         assertTrue(repository.findLatest(COMPETITION, CategoryId.of("CAT-2")).isEmpty());
     }
 
+    @Test
+    void competitionsKeepIndependentHistoriesEvenWhenTheirCategoryAndRevisionMatch() {
+        StandingsRepository repository = repository();
+        CompetitionId otherCompetition = CompetitionId.of("COMP-2");
+        Standings firstCompetition = provisional().publish();
+        Standings secondCompetition = Standings.provisional(otherCompetition, CATEGORY, RulebookVersion.first(),
+                NOW, List.of(entry(1, "OMEGA")));
+        Standings recalculatedSecond = secondCompetition.supersede(List.of(entry(1, "SIGMA")),
+                NOW.plusSeconds(60));
+
+        repository.save(firstCompetition);
+        repository.save(secondCompetition);
+        repository.save(recalculatedSecond);
+
+        assertEquals(List.of(firstCompetition), repository.findHistory(COMPETITION, CATEGORY));
+        assertEquals(firstCompetition, repository.findLatest(COMPETITION, CATEGORY).orElseThrow());
+        assertEquals(List.of(secondCompetition, recalculatedSecond),
+                repository.findHistory(otherCompetition, CATEGORY));
+        assertEquals(recalculatedSecond, repository.findLatest(otherCompetition, CATEGORY).orElseThrow());
+    }
+
     private Standings provisional() {
         return Standings.provisional(COMPETITION, CATEGORY, RulebookVersion.first(), NOW,
                 List.of(entry(1, "DELTA")));
