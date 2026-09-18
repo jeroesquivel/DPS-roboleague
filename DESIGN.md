@@ -16,16 +16,18 @@ aplicar junto con sus consecuencias.
 | --- | --- | --- | --- |
 | Dominio | `domain.*` | Entidades, value objects, reglas y servicios de dominio | Nada fuera del dominio y del JDK |
 | Aplicación | `application.*` | Casos de uso y contratos | Dominio |
-| Detalles | `infrastructure.*`, `demo`, `Main` | Adaptadores en memoria, composition root y ejecución de ejemplo | Aplicación y dominio |
+| Detalles | `infrastructure.*`, `demo`, `Main` | Adaptadores en memoria, composition root y ejecución de ejemplo | Aplicación, dominio y otros componentes de detalles |
 
 El dominio no importa ninguna clase de `application` ni de `infrastructure`: la dirección de las
 dependencias es siempre hacia el centro. Las reglas de negocio (puntaje, elegibilidad, desempates,
-conflictos de agenda) quedan expresadas en clases que no conocen persistencia, framework ni entrada
-de datos.
+conflictos de agenda) quedan expresadas en clases que no conocen persistencia, frameworks ni una
+interfaz externa de entrada/salida.
 
 **Por qué:** la consigna explicita que lo determinante es el modelado y la extensibilidad. Aislar el
-negocio permite que la entrega 2 agregue API REST y persistencia real escribiendo adaptadores
-nuevos, sin tocar el dominio.
+negocio permite agregar una API REST y persistencia real mediante adaptadores nuevos sin cambiar
+las reglas del dominio, siempre que se conserve su significado. La integración también deberá
+resolver representación, transacciones y concurrencia; las interfaces no implementan esas garantías
+(ver sección 8).
 
 **Alternativas descartadas:** una implementación por capas (`controller → service → dao`) que
 acople la lógica a repositorios concretos; y un único paquete plano, que no comunica la separación
@@ -50,18 +52,24 @@ directamente un identificador evita un objeto intermedio que no agrega informaci
 Ambas formas conservan el puerto de entrada y la separación de responsabilidades.
 
 Leer también es un caso de uso: `FindCompetition`, `FindRunResult`, `FindRound`,
-`FindTeamRegistration`, `FindAppeal`, `GetStandings` y `FindAuditTrail` son puertos de entrada como
-cualquier otro. Sin ellos, quien maneja la aplicación termina yendo al repositorio por su cuenta,
-que es exactamente el cruce de frontera que evita esta arquitectura.
+`FindTeamRegistration`, `FindAppeal`, `GetStandings` y `FindAuditTrail` son puertos de entrada.
+En este diseño evitan que la demo o un futuro controller consulten repositorios directamente.
 
 **Por qué los de consulta también:** el ejecutable de ejemplo y los tests son adaptadores de
-entrada. Si pueden alcanzar un `CompetitionRepository`, el controller REST de la entrega 2 va a
-copiar ese atajo y la capa de aplicación deja de ser el único camino al negocio.
+entrada. Mantener sus consultas detrás de esos contratos ofrece un camino explícito por la capa de
+aplicación. Es una convención arquitectónica, no una barrera de seguridad que impida instanciar un
+repositorio público por fuera del composition root.
 
 Los puertos de consulta contienen las operaciones y sus datos de salida. La transformación de
 eventos de auditoría a acciones, usada sólo por los tests, vive en `support/TestEdition.actionsOf`.
-`FindCompetition.View` expone sus categorías sin agregar un método para obtener la primera que
-ningún consumidor utilizaba.
+`FindCompetition.View` proyecta los datos de la competencia y sus categorías. Por separado,
+`CreateCompetition.execute` devuelve un `Result` con `competitionId` y `categoryIds`; su método
+`firstCategory()` lo usan la demo y `TestEdition`. Así la creación ya entrega los identificadores
+necesarios para continuar el flujo sin hacer una consulta adicional.
+
+Los comandos no tienen todos la misma forma: `CalculateRunScore` conserva `Command(RunId)`, mientras
+que las cinco búsquedas por ID enumeradas arriba reciben el identificador directamente. Son contratos
+actuales de operaciones distintas, no una obligación de envolver o desenvolver toda entrada simple.
 
 **Alternativas descartadas:** concentrar responsabilidades sin relación en un servicio y obligar a
 todos los consumidores a depender de sus operaciones. Tener varios métodos relacionados no viola
@@ -76,20 +84,24 @@ entrada, pero agregarle componentes también cambia su constructor y puede exigi
 
 **Dónde:** interfaces en `application/port/out/*`, implementaciones en `infrastructure/memory/*`.
 
-Los puertos de salida están expresados en el lenguaje del negocio (`findLatest(competitionId,
-categoryId)`) y devuelven agregados y `Optional`, nunca filas ni estructuras de base de datos.
+Los repositorios están expresados en el lenguaje del negocio (`findLatest(competitionId,
+categoryId)`) y exponen agregados, `Optional` y listas, nunca filas ni estructuras de base de datos.
+Los otros puertos de salida son `AuditLog`, para registrar/consultar eventos, e `IdGenerator`, para
+obtener identificadores tipados.
 
 Cuando el contrato de un puerto incluye una regla de negocio —"publicar reemplaza la revisión
 provisional, las anteriores no se tocan"— se verifica con un test de contrato abstracto,
-`StandingsRepositoryContractTest`, que todo adaptador de posiciones hereda. Así la
-política no queda escondida en el `save` de un adaptador concreto, donde una implementación con SQL
-podría reinterpretarla en silencio.
+`StandingsRepositoryContractTest`. Actualmente lo hereda `InMemoryStandingsRepositoryTest`; un
+adaptador futuro debería reutilizarlo y sumar sus pruebas de integración. La firma de
+`StandingsRepository` por sí sola no impone esa política: el test fija el comportamiento esperado.
 
-**Por qué:** el dominio define lo que necesita y la infraestructura obedece. Los casos de uso se
-prueban contra adaptadores en memoria reales, sin base de datos.
+**Por qué:** la aplicación define los contratos que necesita en términos del dominio, y la
+infraestructura los implementa. Las pruebas de integración ejercitan adaptadores en memoria reales,
+sin base de datos; también hay un escenario con dobles manuales (ver 5.5).
 
-**Alternativas descartadas:** un `Repository<T, ID>` genérico con CRUD uniforme, que arrastra
-operaciones que ningún caso de uso usa y filtra decisiones de persistencia al dominio; y usar las
+**Alternativas descartadas:** un `Repository<T, ID>` genérico con CRUD uniforme, para no imponer
+operaciones que estos casos de uso no necesitan. Un repositorio genérico no rompe la arquitectura
+por sí mismo, pero aquí no justificaba abstraer las consultas específicas. También se descartó usar las
 implementaciones concretas directamente en los casos de uso, que ataría el negocio al detalle.
 
 ### 1.4 Composition root explícito, sin framework de inyección
@@ -100,15 +112,17 @@ implementaciones concretas directamente en los casos de uso, que ataría el nego
 
 Es el lugar de ensamblado donde se eligen los adaptadores concretos. Los casos de uso reciben sus
 colaboradores por constructor; las entidades pueden tener mutaciones protegidas por métodos de
-negocio. **Sólo expone puertos de entrada:** no hay getters de repositorios. Algunas consultas sí
-devuelven entidades mutables, por lo que un futuro adaptador de API deberá proyectar su salida a
-DTOs y mantener las modificaciones dentro de los casos de uso.
+negocio. **Sus métodos de acceso a casos de uso sólo devuelven puertos de entrada:** no hay getters
+de repositorios. Algunas consultas sí devuelven entidades mutables, por lo que un futuro adaptador
+de API deberá proyectar su salida a DTOs y mantener las modificaciones dentro de los casos de uso.
 
 **Por qué:** deja ver de un vistazo el grafo completo del sistema y permite que los tests construyan
 el módulo con un `Clock` fijo. Además prueba que el dominio funciona sin contenedor.
 
 **Alternativas descartadas:** Spring u otro contenedor (dependencia pesada e innecesaria para una
-entrega de dominio); `static` o singletons (imposibilita aislar el estado entre tests).
+entrega de dominio); repositorios con estado mutable global o singletons compartidos (dificultan
+aislar el estado entre tests). Sí existen constantes y fábricas estáticas sin ese estado compartido,
+como `RoboLeagueCompositionRoot.inMemory`.
 
 ## 2. Modelado del puntaje
 
@@ -129,12 +143,15 @@ consumo).
 pruebas; el algoritmo que consume reglas no necesita conocer esa clase nueva. Cada regla actual
 mantiene su configuración inmutable y se puede probar de forma aislada.
 
-Las siete son `record` inmutables, sin excepción: `PenaltyScoringRule` guarda su catálogo como un
-`Map` inmutable construido con `Collectors.toUnmodifiableMap`.
+Las siete son `record` con configuración inmutable en las implementaciones actuales.
+`PenaltyScoringRule.of` construye su catálogo con `Collectors.toUnmodifiableMap`, y el constructor
+canónico también hace `Map.copyOf`. La interfaz no fuerza que una implementación futura conserve
+esa inmutabilidad (ver sección 8).
 
 **Alternativas descartadas:** un método de cálculo con `switch` sobre un `enum` de tipos de desafío
-(cada desafío nuevo obliga a editar el mismo método, rompiendo OCP); herencia con una clase base
-abstracta de puntaje (acopla las reglas entre sí y no permite combinarlas libremente).
+(cada criterio nuevo obliga a editar el mismo método, en lugar de extenderlo mediante una regla);
+una clase base abstracta de puntaje sin comportamiento común que justificara esa jerarquía. La
+composición actual sólo requiere implementar `ScoringRule`.
 
 ### 2.1.1 El contrato de `ScoringRule` es uno solo para todas las implementaciones
 
@@ -142,24 +159,28 @@ abstracta de puntaje (acopla las reglas entre sí y no permite combinarlas libre
 
 **Dónde:** `domain/scoring/ScoringRule` y las siete implementaciones de `domain/scoring/rule`.
 
-La interfaz declara explícitamente su contrato: **`apply` devuelve siempre al menos una contribución
-explicada y nunca lanza por un dato ausente**. Si a una regla le falta la medición que necesita,
-devuelve una contribución de cero puntos que explica la ausencia, en lugar de tirar una excepción.
+`ScoringRule` declara la firma `apply(ScoringContext)` y el helper por defecto `breakdownFor`; no
+incluye una especificación textual del contrato ni lo fuerza a nivel de tipos. El comportamiento
+común implementado y comprobado para las siete reglas actuales es: **con un contexto válido, emitir
+al menos una contribución explicada y devolver cero ante la ausencia de la medición, evaluación o
+incidente que corresponda**, en lugar de lanzar por esa ausencia.
 
-**Por qué:** un cliente que tiene una `ScoringRule` no puede saber de qué implementación se trata. Si
-una regla lanza ante un dato ausente y otra devuelve cero con explicación, el subtipo cambió el
-*significado* del método y dejó de ser sustituible por la abstracción. Dos tests parametrizados en
+**Por qué:** un cliente puede aplicar una `ScoringRule` sin conocer su implementación. Para conservar
+la sustituibilidad respecto del comportamiento esperado, una regla nueva debe respetar ese manejo
+de datos ausentes. Dos tests parametrizados en
 `ScoringRulesTest` recorren las siete reglas simples de su proveedor `everyRule()` y verifican el
 contrato. Para comprobar una regla nueva hay que agregarla explícitamente a ese proveedor.
 
-**Consecuencia sobre dónde se valida:** que `apply` no lance obliga a validar las entradas antes, al
-capturar el resultado. Por eso el catálogo de penalizaciones vive en `ChallengeSpec` y no dentro de
-`PenaltyScoringRule` (ver 2.4): un incidente que el reglamento no define se rechaza al capturar, que
-es cuando hay alguien mirando, y no al publicar posiciones.
+**Consecuencia sobre dónde se valida:** tolerar datos ausentes al puntuar no reemplaza las validaciones
+del desafío. `CaptureRunResultUseCase` y la validación de correcciones en `ResolveAppealUseCase`
+invocan `ChallengeSpec.validate` y `validateIncidents`. La fuente de configuración del catálogo es
+`ChallengeSpec.penalties`; `PenaltyScoringRule` sí guarda una copia indexada del catálogo recibido
+para calcular deducciones (ver 2.4). Un incidente desconocido se rechaza en esos flujos, aunque
+aplicar la regla de penalización directamente devuelve cero con explicación.
 
-**Alternativas descartadas:** dejar que cada regla decida si lanza o explica (es el estado del que
-partimos: cinco reglas lanzaban, una explicaba y otra hacía las dos cosas); declarar una excepción
-chequeada en la firma, que traslada el problema al llamador sin unificar el significado.
+**Alternativas descartadas:** dar a cada regla un manejo incompatible de la ausencia de datos;
+declarar una excepción chequeada en la firma sin acordar qué significa el resultado de la operación.
+Este contrato no implica que cualquier configuración o argumento inválido sea aceptado.
 
 ### 2.2 Un desafío conoce una lista de reglas, no una regla que a su vez es una lista
 
@@ -171,14 +192,12 @@ chequeada en la firma, que traslada el problema al llamador sin unificar el sign
 regla de la lista, le suma las contribuciones de `PenaltyScoringRule.of(penalties)` (armada
 desde el catálogo del propio desafío, ver 2.4) y devuelve un único `ScoreBreakdown` con todo.
 
-**Por qué:** el único lugar del sistema que necesita combinar varias `ScoringRule` es este
-método. Un `CompositeScoringRule` que envolviera la lista antes de dársela a `ChallengeSpec`
-no evitaba ninguna duplicación real, porque no había un segundo consumidor que repitiera esa
-lógica — y de hecho `ChallengeSpec.score` ya tenía que concatenar manualmente la salida de esa
-regla con la de `PenaltyScoringRule` para separar el catálogo de penalizaciones (2.4). Sacar el
-Composite intermedio deja un solo mecanismo de combinación en vez de dos.
+**Por qué:** el único lugar de producción que combina varias `ScoringRule` es este método.
+Un `CompositeScoringRule` obligatorio alrededor de la lista no evitaría duplicación entre
+consumidores: el desafío igualmente debe incorporar las deducciones de su propio catálogo (2.4).
+La lista directa deja un único punto de combinación, sin un wrapper intermedio.
 
-**Alternativas descartadas:** ver 5.10 para la que se aplicaba antes.
+**Alternativas descartadas:** un Composite explícito obligatorio para el puntaje (ver 5.10).
 
 ### 2.3 Puntaje explicable: el resultado es un desglose, no un número
 
@@ -187,7 +206,7 @@ Composite intermedio deja un solo mecanismo de combinación en vez de dos.
 **Dónde:** `domain/scoring/ScoreContribution`, `ScoreBreakdown` y el retorno de
 `CalculateRunScore.RunScore`.
 
-Cada regla devuelve `ScoreContribution` con su código, su explicación textual y los puntos aportados;
+Cada regla devuelve una lista de `ScoreContribution` con código, explicación textual y puntos aportados;
 el total es la suma de las contribuciones. Las reglas emiten contribución incluso cuando aportan
 cero ("bonificación no otorgada", "consumo dentro del margen"), porque la ausencia de puntos también
 es información que el juez necesita ver.
@@ -202,7 +221,7 @@ desincroniza).
 
 ### 2.3.1 La naturaleza de una contribución es un concepto del dominio
 
-**Patrón / principio:** Dependency Inversion (DIP), evitar type codes.
+**Patrón / principio:** desacoplamiento de implementaciones concretas, clasificación semántica tipada.
 
 **Dónde:** `domain/scoring/ContributionKind` (`EARNED`, `BONUS`, `PENALTY`), usado por
 `ScoreBreakdown.totalOf` y consultado por `TeamScoreSummary.penaltyPoints`.
@@ -210,19 +229,18 @@ desincroniza).
 Cada contribución declara qué representa, con independencia de qué regla la produjo. El desempate por
 penalizaciones pregunta `breakdown.totalOf(ContributionKind.PENALTY)`.
 
-**Por qué:** el ranking es política de alto nivel y no puede depender de una clase concreta de
-`domain.scoring.rule`. Antes preguntaba `totalFor(PenaltyScoringRule.CODE)`, es decir importaba una
-implementación y filtraba por el texto de su constante: renombrar esa constante rompía los desempates
-en silencio —compilaba, corría y devolvía cero para todos— y un reglamento con dos reglas de
-penalización distintas sólo habría contado una. Con `ContributionKind`, el paquete `ranking` no
-importa nada de `scoring.rule` y el compilador sostiene la relación.
+**Por qué:** el ranking debe reconocer las deducciones por su significado, no por el código de una
+implementación. Con `ContributionKind`, el paquete `ranking` no importa nada de `scoring.rule`.
+Además de los incidentes de `PenaltyScoringRule`, `ResourceScoringRule` etiqueta sus deducciones como
+`PENALTY`, por lo que ambas cuentan en el desempate sin que éste tenga que conocer esas clases.
 
 **Consecuencia adicional:** la publicación puede separar lo ganado de las bonificaciones y de las
 penalizaciones sin conocer ninguna regla concreta, que es lo que el requisito de explicabilidad pide.
 
 **Alternativas descartadas:** dejar el código de regla como `String` y seguir comparando textos
-(`totalFor("PENALTIE")` compila y devuelve cero sin avisar); que el ranking recibiera la lista de
-códigos de penalización desde el reglamento (mueve el acoplamiento de lugar en vez de eliminarlo).
+(un contrato basado en texto permitiría errores como `totalFor("PENALTIE")`); reconocer todas las
+penalizaciones mediante una lista de códigos concretos. El contrato actual de `totalFor` recibe
+`ScoringRuleCode`, mientras que `totalOf` consulta la naturaleza de la contribución.
 
 ### 2.4 Penalizaciones y bonificaciones como parte del mismo mecanismo
 
@@ -231,8 +249,10 @@ códigos de penalización desde el reglamento (mueve el acoplamiento de lugar en
 **Dónde:** `PenaltyDefinition`, `IncidentReport`, `PenaltyScoringRule`, `ThresholdBonusRule` y
 `ChallengeSpec.penalties`.
 
-Una penalización es una contribución negativa y una bonificación una contribución positiva: ambas
-aparecen en el mismo desglose, etiquetadas con su `ContributionKind`.
+Las reglas representan las deducciones con contribuciones negativas y los bonos otorgados con
+contribuciones positivas, según sus parámetros configurados; cuando no se aplican emiten cero.
+Todas aparecen en el mismo desglose, etiquetadas con su `ContributionKind`. Ese tipo es una
+clasificación semántica: `ScoreContribution` no impone por sí mismo el signo de los puntos.
 
 El catálogo de penalizaciones es un componente de `ChallengeSpec`, no un parámetro escondido dentro
 de la regla de puntaje, porque cumple dos funciones: `ChallengeSpec.validateIncidents` rechaza al
@@ -254,17 +274,19 @@ el total, lo que las dejaría fuera de la explicación y obligaría a un orden i
 **Dónde:** `domain/rulebook/Rulebook`, `RulebookVersion` y `Rulebook.of`.
 
 Un `Rulebook` reúne los desafíos, la política de elegibilidad y los criterios de desempate de una
-versión. Publicar un reglamento nunca modifica el anterior: `PublishRulebookUseCase` crea la versión
-siguiente y `Competition.activateRulebook` sólo acepta versiones que superen a la vigente.
+versión. En el flujo normal, publicar un reglamento no modifica el anterior:
+`PublishRulebookUseCase` crea la versión siguiente y `Competition.activateRulebook` sólo acepta
+versiones que superen a la vigente.
 `PublishRulebookUseCase` ya recibe todos los componentes juntos y los pasa a `Rulebook.of`, que
 indexa los desafíos por identificador y construye el reglamento. Si un identificador se repite,
-conserva el último desafío recibido, igual que la implementación anterior. El constructor mantiene
+conserva el último desafío recibido: no rechaza los IDs duplicados. El constructor mantiene
 las validaciones y las copias defensivas del mapa de desafíos y la lista de desempates.
 
 **Por qué:** el enunciado exige poder recalcular resultados con exactamente la versión de reglas
-correspondiente. Eso sólo es confiable si las versiones publicadas son inmutables. La fábrica
-conserva esa garantía y evita el estado intermedio del builder, cuyo único consumidor ya tenía
-todos los datos disponibles.
+correspondiente. El record y sus copias defensivas evitan modificar sus colecciones; las estrategias
+actuales conservan su configuración inmutable. La fábrica evita el estado intermedio de un builder
+porque el caso de uso ya tiene todos los datos disponibles. Las interfaces de estrategia no fuerzan
+inmutabilidad profunda y el almacenamiento no bloquea reemplazos de versiones (ver sección 8).
 
 **Alternativas descartadas:** un builder para volver a reunir datos que ya llegan juntos; un
 reglamento mutable con historial de cambios (cualquier corrección alteraría resultados ya
@@ -299,6 +321,11 @@ falla si ya es definitiva; `supersede()` abre una revisión nueva provisional co
 de reglamento. Generar dos veces la misma tabla se rechaza con un mensaje que indica usar el
 recálculo, y el repositorio conserva todas las revisiones.
 
+Al generar, la versión activa determina los desempates de la tabla. Al recalcular, se conserva la
+versión de la tabla anterior para esos desempates; cada corrida se puntúa por separado con su propia
+versión fijada. No se fuerza a todas las corridas de una categoría a usar una única fórmula, ni se
+congela el conjunto de resultados: el servicio vuelve a consultar las corridas disponibles.
+
 **Por qué:** cubre "diferenciar resultados provisionales y definitivos" y "reprocesar posiciones
 después de una corrección" sin que una operación pise silenciosamente a la otra, dejando trazable
 cada publicación.
@@ -310,6 +337,9 @@ reemplaza la misma revisión, `lastEntry` obtiene la vigente y sus valores ya es
 el historial. Las consultas devuelven listas inmutables copiadas del mapa. El contrato se mantiene
 aunque las revisiones se guarden fuera de orden, sin eliminar elementos de una lista ni ordenarla
 en cada lectura.
+
+Esta conservación describe los flujos de publicación y recálculo. `save` es un upsert por revisión:
+no impide que un llamador directo reemplace arbitrariamente una revisión anterior o definitiva.
 
 **Alternativas descartadas:** una tabla mutable que se sobrescribe (pierde el histórico y no permite
 comparar antes y después de una apelación); publicar automáticamente tras generar (impide revisar el
@@ -325,12 +355,17 @@ implementaciones en `domain/ranking/rule` y `RankingService`.
 
 `RankingService` arma el comparador final: puntaje total descendente y luego, en orden, cada regla de
 desempate del reglamento. Si ninguna regla separa a dos equipos, comparten posición y la siguiente
-posición salta, y cada entrada registra qué regla resolvió el desempate.
+posición salta. El ID del equipo sólo da un orden determinista a los empates completos; no les
+asigna posiciones distintas.
 
-Cada entrada registra un `AppliedTiebreak`, que lleva el código del criterio —para ordenar o filtrar
-por máquina— y su descripción, que es el texto que ve un juez. Guardar sólo el código no alcanzaba:
-dos `FastestMetricTiebreak` configurados con métricas distintas producen el mismo `FASTEST_METRIC` y
-la tabla no decía cuál criterio había resuelto el empate.
+Cuando una entrada tiene el mismo total que la anterior y algún criterio las separa, su lista
+`appliedTiebreaks` registra un `AppliedTiebreak` con el primer criterio que discrimina entre esas dos
+entradas. La lista queda vacía para la primera entrada, ante totales distintos y ante un empate
+completo. No es una traza de todas las comparaciones del ordenamiento.
+
+`AppliedTiebreak` guarda código y descripción. Esta última distingue, por ejemplo, dos
+`FastestMetricTiebreak` con métricas distintas pero el mismo código `FASTEST_METRIC`.
+`FewestPenaltiesTiebreak` compara puntos deducidos de tipo `PENALTY`, no cantidad de incidentes.
 
 **Por qué:** el orden de los criterios de desempate es una decisión del reglamento, no del código; y
 registrar la regla aplicada mantiene la coherencia con el requisito de explicabilidad.
@@ -349,17 +384,19 @@ que `Comparator.thenComparing` ya ofrece).
 `TeamCompositionRule`, `RobotClassRule`, `RobotSpecificationRule`, `RequiredDocumentsRule`.
 
 Cada restricción es una regla que devuelve la lista de violaciones que encuentra. `EligibilityPolicy`
-es a la vez una regla y la composición de todas: devuelve un `EligibilityVerdict` con todas las
-violaciones, no con la primera.
+es a la vez una regla y la composición de todas: `evaluate` concatena las listas de violaciones y
+`verdictFor` las envuelve en un `EligibilityVerdict`. No se corta en la primera violación.
 
 **Por qué:** un equipo debe recibir de una sola vez todo lo que tiene que corregir. Además, las
 restricciones varían por edición y categoría, así que se configuran en el reglamento en lugar de
-estar cableadas.
+estar cableadas en el caso de uso. La categoría aporta edades y clase de robot; el registro usa como
+fecha de referencia el inicio de la competencia.
 
 **Alternativas descartadas:** validaciones con corte temprano (`if` encadenados que abortan en el
 primer error), que obligan a registrarse varias veces para descubrir todos los problemas; validación
-por anotaciones sobre el registro, que no permite reglas dependientes de la categoría ni de la fecha
-de referencia.
+por anotaciones estáticas sobre el registro, que por sí solas no expresan el contexto de categoría
+y fecha de referencia. Validadores personalizados podrían incorporarlo, pero aquí se eligieron
+reglas de dominio explícitas y componibles.
 
 ### 4.2 Detección de conflictos de agenda como servicio de dominio
 
@@ -372,6 +409,10 @@ así que la regla no pertenece a ninguna entidad. El caso de uso reúne los turn
 servicio decide; `Round` conserva la invariante que sí le corresponde (un equipo no puede tener dos
 turnos en la misma ronda).
 
+`ScheduleRoundUseCase` reúne los turnos de la misma competencia y también incorpora los candidatos
+ya aceptados dentro del comando. No busca reservas en otras competencias. `TimeSlot.overlaps`
+permite que un turno empiece exactamente cuando termina otro.
+
 **Por qué:** mantiene la regla en el dominio y testeable sin repositorios, sin forzarla dentro de una
 entidad que no tiene toda la información.
 
@@ -379,10 +420,10 @@ Que un turno caiga dentro de las fechas de la competencia es una invariante dist
 están esas fechas: `Competition.requireDateWithinPeriod`. El caso de uso la invoca por cada turno, de
 inicio y de fin. Un tipo de conflicto es un `ScheduleConflictType`, no un `String`.
 
-**Alternativas descartadas:** poner la validación en el caso de uso (mezcla orquestación con negocio y
-no se puede reutilizar); poner la validación en `Round` (no ve los turnos de las demás rondas); dejar
-el período de la competencia como dato decorativo, que es lo que permitía agendar un turno en 2027
-dentro de una competencia de cuatro días de marzo de 2026.
+**Alternativas descartadas:** poner la detección de conflictos en el caso de uso (mezcla orquestación
+con negocio y dificulta reutilizar la regla de forma aislada); ponerla en `Round` (no ve los turnos
+de las demás rondas); dejar el período de la competencia como dato decorativo, lo que permitiría
+agendar turnos en fechas ajenas al evento.
 
 ### 4.3 Auditoría: el resultado conserva el original y todas las modificaciones
 
@@ -391,8 +432,12 @@ dentro de una competencia de cuatro días de marzo de 2026.
 **Dónde:** `domain/result/RunResult` y `ResultCorrection`.
 
 `RunResult` guarda las mediciones e incidentes originales y una lista de correcciones; las mediciones
-vigentes son las de la última corrección. Cada corrección registra momento, responsable, motivo y la
-apelación que la originó, y no puede ser anterior a la captura.
+vigentes son las de la última corrección agregada a la lista, no necesariamente la de mayor fecha.
+Cada corrección registra momento, responsable, motivo y un `Optional<AppealId>` de origen; el flujo
+de resolución usa `ResultCorrection.fromAppeal` para completarlo. Una corrección no puede ser anterior
+a la captura, pero no se exige que sea posterior a las demás correcciones. Las evaluaciones de jueces
+se conservan como fueron capturadas: el modelo de corrección actual modifica mediciones e incidentes,
+no esas evaluaciones.
 
 **Por qué:** cumple "conservar los valores originales y todas las modificaciones" dentro del modelo,
 no en una bitácora externa que podría desincronizarse. El recálculo usa siempre los valores vigentes
@@ -408,7 +453,9 @@ y la investigación puede reconstruir el camino completo.
 **Dónde:** `application/port/out/AuditLog`, `domain/audit/AuditEvent` y `AuditAction`.
 
 Cada caso de uso que modifica estado registra un `AuditEvent` tipado con acción, sujeto, responsable
-y detalles. Los tests verifican, por ejemplo, que aceptar una apelación deja `RESULT_CORRECTED`.
+y detalles. Los tests verifican, por ejemplo, que aceptar una apelación **con corrección** deja
+`RESULT_CORRECTED`. Aceptarla sin corrección registra la decisión, sin modificar la corrida ni
+recalcular automáticamente las posiciones.
 
 **Por qué:** la auditoría atraviesa todos los casos de uso y debe poder apuntar mañana a un archivo o
 a una base sin tocar el negocio.
@@ -430,10 +477,14 @@ reglamento fijado en la corrida antes de aplicarlas.
 **Por qué:** las reglas de transición viven en la entidad, no en el caso de uso, que sólo orquesta. Y
 una corrección no puede introducir datos que el propio desafío rechazaría.
 
-El caso de uso valida **antes** de mutar: resuelve la corrección contra el desafío y recién después
-acepta o rechaza la apelación. Si validara después, una corrección inadmisible dejaría la apelación
+Si se acepta con una corrección, el caso de uso valida **las mediciones y los códigos de incidente
+antes** de mutar: resuelve la corrección contra el desafío y recién después acepta la apelación.
+Si validara después, una corrección inadmisible dejaría la apelación
 aceptada y la corrección sin aplicar, dos estados incompatibles en el mismo flujo. `TeamRegistration`
 protege sus transiciones con el mismo criterio que `Appeal`: una inscripción se decide una sola vez.
+
+Esto no equivale a validar todo el comando por adelantado ni a ofrecer una transacción: construir la
+corrección o registrar auditoría todavía puede fallar después de resolver la apelación (ver sección 8).
 
 **Alternativas descartadas:** un campo de estado editable desde afuera (cualquier código podría dejar
 la apelación en un estado inconsistente); mutar primero y validar después confiando en que la
@@ -452,21 +503,23 @@ Los identificadores son records distintos que implementan `Identifier`, de modo 
 rechaza valores negativos; `MetricKind` valida que un conteo de objetivos sea entero y que una razón
 de precisión no supere 1.
 
-**Por qué:** las invariantes se verifican una sola vez, en la construcción, y no se repiten en cada
-caso de uso. Con `String` o `BigDecimal` sueltos, el compilador no ayuda y las validaciones se
-dispersan.
+**Por qué:** las invariantes intrínsecas del valor se concentran en su construcción. Las que dependen
+del contexto se verifican donde corresponde: por ejemplo, `MetricKind.accepts` se consulta desde
+`MetricDefinition.validate`, invocado por `ChallengeSpec.validate`. Con `String` o `BigDecimal`
+sueltos se pierde distinción semántica y las validaciones tienden a dispersarse.
 
-Los once identificadores repiten el mismo cuerpo de cuatro líneas. **Es duplicación deliberada.**
+Los once identificadores repiten la validación y la fábrica `of`. **Es duplicación deliberada.**
 Los records nominales hacen explícitos los tipos `CategoryId` y `TeamId` en las firmas y evitan
 confundirlos. Un `Id<T>` correctamente diseñado también podría preservar esa distinción; se
 prefirieron tipos concretos por su legibilidad y simplicidad en este módulo.
 
-También son value objects tipados `ScoringRuleCode` y `ScheduleConflictType`, por la misma razón:
-`totalFor("PENALTIE")` compilaba y devolvía cero.
+`ScoringRuleCode` es otro value object nominal. `ScheduleConflictType`, en cambio, es un enum que
+restringe los tipos de conflicto a `ARENA_BUSY`, `TEAM_BUSY` y `JUDGE_BUSY`. Ambos reemplazan textos
+libres por tipos explícitos; no implican el mismo mecanismo de validación.
 
 **Alternativas descartadas:** `UUID`/`String` para todos los ids (intercambiables por error); `double`
-para puntajes (errores de redondeo inaceptables en un resultado deportivo); una jerarquía de
-identificadores para ahorrar la repetición, que destruye la garantía que justifica tenerlos.
+para puntajes (errores de representación binaria); usar un único tipo común de identificador en
+todas las firmas para ahorrar repetición, perdiendo la distinción nominal.
 
 ### 4.7 Tiempo e identificadores inyectados
 
@@ -475,10 +528,11 @@ identificadores para ahorrar la repetición, que destruye la garantía que justi
 **Dónde:** `java.time.Clock` e `IdGenerator` inyectados en los casos de uso;
 `infrastructure/id/SequentialIdGenerator`.
 
-`IdGenerator` declara un método por tipo de identificador (`nextTeamId()`, `nextRunId()`, …) en lugar
-de un `nextId(String prefix)` genérico. Con el prefijo como texto, `RunId.of(idGenerator.nextId("TEAM"))`
-compilaba y producía un identificador válido y equivocado, y el formato quedaba repartido por ocho
-casos de uso; ahora vive entero en el adaptador.
+`IdGenerator` declara ocho métodos para los identificadores creados por los casos de uso: temporada,
+competencia, categoría, equipo, ronda, turno, corrida y apelación. No genera `ChallengeId`, `ArenaId`
+ni `JudgeId`, que llegan desde la configuración o las entradas. El formato y los contadores viven
+en `SequentialIdGenerator`; un `nextId(String prefix)` genérico repartiría esos detalles entre los
+casos de uso y permitiría confundir prefijos sin ayuda del compilador.
 
 **Por qué:** ningún caso de uso llama a `Instant.now()` ni genera ids por su cuenta, así que los tests
 corren con un reloj fijo y con identificadores predecibles, y las aserciones sobre marcas de tiempo
@@ -494,9 +548,11 @@ determinísticos.
 **Dónde:** `application/service/CategoryScoringService`.
 
 Recorre las rondas de una categoría, puntúa cada corrida con su reglamento fijado y arma los
-`TeamScoreSummary` que consume `RankingService`. Lo usan `GenerateStandings`, `RecalculateStandings` y
-`CalculateRunScore`. Se llama *scoring service* y no *collector* porque lo que hace es puntuar: el
-nombre anterior describía el bucle, no la responsabilidad.
+`TeamScoreSummary` que consume `RankingService`. `GenerateStandingsUseCase` y
+`RecalculateStandingsUseCase` usan `collect`; `CalculateRunScoreUseCase` reutiliza `scoreRun` para una
+corrida individual. `TeamScoreSummary.totalPoints` suma todos los intentos capturados de todas las
+rondas de la categoría; no selecciona sólo el mejor intento. Un equipo sin corridas capturadas no
+aparece en la colección ni en el ranking generado.
 
 **Por qué:** si cada caso de uso armara la tabla por su cuenta, generar y recalcular podrían divergir,
 que es exactamente el error que el requisito de recálculo busca evitar.
@@ -512,13 +568,16 @@ No se aplicó: el estado se guarda como agregados, no como secuencia de eventos.
 exige la consigna se cubre con el historial de correcciones de `RunResult`, las revisiones de
 `Standings` y la bitácora `AuditLog`.
 
-**Consecuencia:** no se puede reconstruir el estado a cualquier instante arbitrario ni reproyectar el
-pasado con reglas nuevas; sí se conserva todo lo que el negocio pide auditar. Si más adelante se
-exigiera reconstrucción total, el historial actual es el punto de partida para migrar.
+**Consecuencia:** no existe una reconstrucción general del estado del sistema a cualquier instante
+arbitrario a partir de eventos. Sí se conservan originales, correcciones, decisiones y revisiones
+para los flujos implementados. El recálculo de puntajes existe sin Event Sourcing: usa valores vigentes
+y las versiones de reglas fijadas. Una reconstrucción temporal más amplia requeriría otro diseño.
 
 ### 5.2 CQRS
 
-No se aplicó: los casos de uso de lectura y escritura comparten los mismos puertos y modelos.
+No se adoptaron modelos de lectura y escritura independientes. Los casos de uso tienen distintos
+puertos de entrada, pero comparten repositorios y modelos de negocio. Proyecciones de salida como
+`FindCompetition.View` no constituyen por sí solas una infraestructura de modelos de lectura separados.
 
 **Consecuencia:** consultas de gran volumen (posiciones históricas de todas las categorías) pasarán por
 los mismos repositorios y podrán ser menos eficientes. A esta escala, la complejidad de mantener dos
@@ -537,17 +596,22 @@ infraestructura de mensajería que esta entrega no tiene.
 
 No se aplicó: el cableado es manual en `RoboLeagueCompositionRoot`.
 
-**Consecuencia:** agregar un caso de uso obliga a tocar el composition root. A cambio, el módulo compila
-y corre sin dependencias externas y el grafo de dependencias es visible en un archivo.
+**Consecuencia:** exponer un caso de uso nuevo desde el composition root exige modificar ese archivo.
+A cambio, el ensamblado es visible y la producción sólo depende del JDK. Los tests sí usan JUnit
+Jupiter, y Maven usa los plugins de compilación, verificación y empaquetado declarados en `pom.xml`.
 
 ### 5.5 Framework de mocking
 
-No se aplicó: los tests de integración usan los adaptadores en memoria reales y los unitarios
-construyen objetos de dominio directamente.
+No se usa un framework de mocking. La mayoría de las pruebas de casos de uso usan el composition
+root con adaptadores en memoria reales; las pruebas de dominio construyen objetos directamente.
+`AppealRecalculationTest.anAppealFromAnotherTeamIsRejectedWithoutSavingOrAuditingIt` instancia el
+caso de uso directamente con dobles manuales de `AppealRepository` y `AuditLog` que registran las
+escrituras para comprobar que el rechazo no guarda ni audita una apelación.
 
-**Consecuencia:** un cambio en la firma de un puerto obliga a actualizar el adaptador en memoria. A
-cambio, los tests verifican comportamiento real y no interacciones simuladas, y no quedan atados a la
-implementación interna de los casos de uso.
+**Consecuencia:** un cambio en la firma de un puerto puede exigir actualizar sus adaptadores y dobles
+manuales. La suite se centra en resultados, estados y efectos observables; el escenario con dobles
+también comprueba la ausencia de escrituras. No depende de expectativas configuradas con una
+biblioteca de mocking.
 
 ### 5.6 Repositorio genérico y clase base de entidad
 
@@ -558,46 +622,17 @@ en memoria. A cambio, ninguna entidad hereda comportamiento que no necesita y ca
 sólo lo que el negocio usa (ISP). Lo que sí se comparte entre adaptadores es el **test de contrato**,
 que es donde la repetición sí sería peligrosa.
 
-### 5.9 Métodos en las interfaces "por si acaso"
-
-No se aplicó: una interfaz sólo declara lo que algún cliente llama. `ScoringRule` y `EligibilityRule`
-tenían un `code()` que ninguna clase invocaba nunca —dieciséis implementaciones existiendo para
-llenar un contrato sin usuarios— y se eliminó; las constantes `CODE` quedaron, porque etiquetar
-contribuciones y violaciones sí es un uso real. `TiebreakRule.description()` tampoco tenía cliente:
-en vez de borrarlo se le dio el que le faltaba, `AppliedTiebreak`, porque resolvía un agujero real de
-explicabilidad.
-
-**Consecuencia:** una regla de puntaje ya no puede identificarse a sí misma de forma polimórfica. Si
-alguna vez hace falta —por ejemplo, para desactivar reglas por configuración— habrá que volver a
-agregar el método, esta vez con un cliente que lo justifique.
-
 ### 5.7 Motor de reglas configurable por datos
 
 No se aplicó: las reglas de puntaje se componen en código Java, no se interpretan desde una
 configuración externa o un DSL.
 
-**Consecuencia:** publicar un reglamento con una fórmula inédita requiere una clase nueva y un
-despliegue, no un archivo de configuración. A cambio, las reglas son tipadas, testeables y depurables;
-un intérprete propio hubiera sido la parte más riesgosa del sistema. La interfaz `ScoringRule` deja la
-puerta abierta a agregar un adaptador que construya reglas desde datos.
-
-### 5.10 Composite explícito para combinar reglas de puntaje
-
-Se aplicó en un primer momento (`CompositeScoringRule`, ver versión anterior de 2.2) y se sacó
-después de la refactorización de 15b77aa: `ChallengeSpec` pasó a separar el catálogo de
-penalizaciones de la regla de puntaje principal (S2 en `REVIEW.md`), y desde ese momento
-`ChallengeSpec.score` ya combinaba dos fuentes de contribuciones a mano (`Stream.concat`)
-además de la que el Composite armaba. Mantener las dos formas de combinar reglas —una envuelta
-en una clase, otra manual— era la inconsistencia real, no el Composite en sí. Se resolvió
-haciendo que `ChallengeSpec` sostenga la lista de reglas directamente.
-
-**Consecuencia:** se pierde la posibilidad de anidar composites dentro de otros composites (un
-bloque de puntaje que agrupa a su vez otros bloques con su propio nombre). Ningún desafío de
-este dominio necesitó esa profundidad: una lista plana alcanza para expresar "una combinación
-de factores" tal como lo pide el enunciado. Si en el futuro un reglamento necesitara agrupar un
-subconjunto de reglas bajo un nombre propio, nada impide reintroducir una implementación de
-`ScoringRule` que envuelva una sublista — la interfaz no cambió, sólo dejó de ser obligatorio
-pasar por ella para combinar las reglas de un desafío.
+**Consecuencia:** incorporar una fórmula inédita requiere una implementación Java y distribuir ese
+código, no solamente editar un archivo de configuración. Los coeficientes de las estrategias
+existentes sí se pasan por constructor al armar un reglamento nuevo. Las reglas son tipadas,
+testeables y depurables; un intérprete propio hubiera agregado una complejidad que esta entrega no
+necesita. La interfaz `ScoringRule` deja la puerta abierta a agregar un adaptador que construya reglas
+desde datos.
 
 ### 5.8 Persistencia real, API REST y seguridad
 
@@ -607,6 +642,30 @@ ejecutar y probar el dominio de punta a punta.
 **Consecuencia:** no hay transaccionalidad ni concurrencia global: un caso de uso que escribe en
 varios repositorios no es atómico. Los puertos existentes permiten sustituir el almacenamiento,
 pero una integración real también deberá resolver mapeo, transacciones, concurrencia y fallos.
+
+### 5.9 Métodos en las interfaces "por si acaso"
+
+No se agregan operaciones anticipando clientes inexistentes. `ScoringRule` declara `apply` y el
+helper por defecto `breakdownFor`; `EligibilityRule` sólo declara `evaluate`. Ninguna de las dos
+tiene un método polimórfico `code()`: las implementaciones etiquetan sus contribuciones o violaciones
+con constantes propias. En cambio, `TiebreakRule` conserva `code()` y `description()`, utilizados
+por `AppliedTiebreak.of` para registrar el criterio discriminante.
+
+**Consecuencia:** identificar o desactivar una regla de puntaje de forma polimórfica no es una
+capacidad de su interfaz actual. Si aparece ese requisito, habrá que definir el contrato con un
+cliente y una necesidad concretos.
+
+### 5.10 Composite explícito para combinar reglas de puntaje
+
+No existe `CompositeScoringRule` en el código actual. `ChallengeSpec` sostiene directamente una
+lista de reglas y combina sus contribuciones con las deducciones de su catálogo mediante
+`Stream.concat` (ver 2.2). Un wrapper obligatorio alrededor de esa lista agregaría otro mecanismo
+de combinación sin un segundo consumidor que lo justificara.
+
+**Consecuencia:** la configuración actual es plana y no ofrece bloques de puntaje anidados con
+nombre propio. Si aparece esa necesidad, se podría incorporar una `ScoringRule` que envuelva una
+sublista, sin cambiar la interfaz. Esto no elimina Composite de todo el sistema:
+`EligibilityPolicy` sí implementa `EligibilityRule` y compone otras reglas de elegibilidad.
 
 ## 6. Cobertura de los requisitos obligatorios
 
@@ -619,7 +678,7 @@ pero una integración real también deberá resolver mapeo, transacciones, concu
 | Programación | `ScheduleRoundUseCase`, `Round`, `Heat`, `TimeSlot`, `ScheduleConflictDetector`, `Competition.requireDateWithinPeriod` |
 | Captura de resultados | `CaptureRunResultUseCase`, `RunResult`, `MeasurementSet`, `JudgeEvaluation`, `IncidentReport` |
 | Cálculo explicable | `CalculateRunScoreUseCase`, `ScoreBreakdown`, `ScoreContribution`, `ContributionKind` |
-| Ranking | `RankingService`, `TiebreakRule`, `AppliedTiebreak` y sus implementaciones |
+| Ranking | `RankingService`, `TiebreakRule`, `domain/ranking/rule/*` y `AppliedTiebreak` |
 | Publicación | `Standings`, `PublicationStatus`, `GenerateStandingsUseCase`, `PublishStandingsUseCase`, `GetStandingsUseCase` |
 | Apelaciones | `Appeal`, `SubmitAppealUseCase`, `ResolveAppealUseCase` |
 | Recálculo | `RecalculateStandingsUseCase`, `CategoryScoringService` |
@@ -634,23 +693,29 @@ publicación.
 
 Dos tests parametrizados recorren las siete reglas simples enumeradas en `ScoringRulesTest.everyRule`
 y verifican el contrato común (ver 2.1.1). Una implementación nueva debe incorporarse a ese proveedor
-y tener pruebas de su fórmula; no existe descubrimiento automático de clases. El compuesto tiene
-pruebas específicas.
+y tener pruebas de su fórmula; no existe descubrimiento automático de clases. La combinación de la
+lista de reglas con el catálogo de penalizaciones y la separación de tipos de contribución se
+verifican en `ChallengeSpecTest`, no mediante tests de una clase Composite.
 
-Los tests de integración ejercitan los casos de uso contra los adaptadores en memoria a través del
-composition root, con un reloj fijo e identificadores secuenciales. Cubren los escenarios de negocio
+La mayoría de las pruebas de casos de uso ejercitan los adaptadores en memoria a través del
+composition root, con un reloj fijo e identificadores secuenciales. También existe la prueba con
+dobles manuales descrita en 5.5. Se cubren los escenarios de negocio
 más relevantes: aceptar y rechazar una inscripción, programar una ronda con conflictos o fuera del
 período de la competencia, capturar resultados con validaciones de mediciones y de incidentes,
 obtener el desglose explicable, sostener la versión de reglamento fijada al capturar, publicar
 posiciones y el circuito completo de apelación aceptada, corrección y recálculo que reordena la
 tabla, incluido el caso en que la corrección se rechaza y la apelación queda sin resolver.
 
-`StandingsRepositoryContractTest` fija el contrato del puerto de posiciones; el adaptador en memoria
-lo hereda y cualquier adaptador futuro también.
+`StandingsRepositoryContractTest` fija el comportamiento esperado del puerto de posiciones;
+`InMemoryStandingsRepositoryTest` lo hereda. Los adaptadores futuros deberían reutilizar esa suite;
+no existe un mecanismo que fuerce automáticamente esa herencia.
 
-El reglamento sobre el que corren los tests es `support/RescueEditionFixture`, propio de `src/test`.
-El recorrido de ejemplo de `demo` arma el suyo por separado: las pruebas del dominio y de casos de
-uso no dependen de su configuración. `DemoScenarioTest` sí verifica intencionalmente el demo.
+`support/TestEdition` configura las pruebas de casos de uso con `support/RescueEditionFixture`,
+propio de `src/test`; las pruebas de dominio también construyen configuraciones aisladas para sus
+escenarios. La demo usa por separado `DemoRulebook`, de visibilidad de paquete. Las pruebas del
+dominio y de casos de uso no dependen de esa configuración. `DemoScenarioTest` sí verifica
+intencionalmente el demo: que se ejecute sin excepción y registre generación, publicación y recálculo.
+No reemplaza las aserciones de resultados de negocio de los tests específicos.
 
 ## 8. Evolución: qué cambia cuando cambia una dependencia o una regla
 
@@ -665,21 +730,22 @@ requisito concreto, no componentes HTTP ya implementados.
 
 | Cambio | Punto de adaptación | Condición y prueba necesaria |
 | --- | --- | --- |
-| Cambia una URL, un campo JSON o un código HTTP de nuestra futura API | Controller, DTO y mapper de entrada/salida | El mismo significado se traduce al mismo `Command`; probar formato y errores en el adaptador |
+| Cambia una URL, un campo JSON o un código HTTP de nuestra futura API | Controller, DTO y mapper de entrada/salida | Conservar el significado de la entrada tipada (`Command` o ID); probar formato y errores en el adaptador |
 | Se sustituye REST por otra entrada, como mensajería | Nuevo adaptador que invoca los mismos puertos de entrada | Un transporte asíncrono también exige decidir duplicados, orden e idempotencia |
 | Cambia la API de un proveedor externo | Adaptador detrás de un puerto de salida definido por la necesidad de aplicación | Traducir datos, unidades y errores; probar contrato e integración con el proveedor |
 | Se reemplaza el proveedor completo | Nueva implementación del mismo puerto y nuevo ensamblado | Sólo es sustituible si conserva el contrato semántico; una capacidad faltante exige una decisión del negocio |
 | Memoria se reemplaza por SQL u otro almacenamiento | Adaptadores de repositorio y composition root | Preservar versiones/revisiones, ausencia y orden; reutilizar tests de contrato y agregar integración real |
-| Cambia reloj o formato de identificadores | `Clock` o implementación de `IdGenerator` | No depender del texto de IDs en reglas; usar reloj controlado en pruebas |
+| Cambia reloj o formato de identificadores | `Clock` o implementación de `IdGenerator` | No usar el texto del ID como desempate de negocio; distinguirlo del orden técnico de empates completos (3.4); usar reloj controlado en pruebas |
 | Cambia un coeficiente o umbral | Configuración de una nueva versión del reglamento | Probar resultado esperado y conservación del cálculo anterior |
 | Aparece una fórmula nueva | Nueva `ScoringRule`, configuración y pruebas | Conservar contribuciones explicadas, tipos y comportamiento con datos ausentes |
 | Aparece una restricción o desempate | Nueva `EligibilityRule` o `TiebreakRule` | Verificar composición, prioridad y contratos |
 | Se exige tomar sólo el mejor intento | Política de agregación en lugar de la suma fija de `TeamScoreSummary` | Cambio de negocio aún no configurable; probar escenarios donde suma y mejor intento producen ganadores distintos |
 | Cambian permisos, plazos o etapas de apelación | Reglas, casos de uso y, si corresponde, estados de dominio | Probar transiciones permitidas y prohibidas; el DTO HTTP no decide estas políticas |
 
-Una API de entrada debería recorrer `HTTP DTO → mapper → Command → caso de uso` y mapear la
+Una API de entrada debería recorrer `HTTP DTO → mapper → entrada tipada → caso de uso` y mapear la
 respuesta a un DTO propio. Serializar entidades mutables como contrato público acoplaría la API
-al modelo interno. El mapper traduce representación; fórmulas, elegibilidad y transiciones quedan
+al modelo interno. La entrada tipada puede ser un `Command` o el ID que recibe una consulta. El mapper
+traduce representación; fórmulas, elegibilidad y transiciones quedan
 en dominio. Cambiar `elapsed_ms` por `time_seconds` requiere convertir unidades, no sólo renombrar.
 
 Para un proveedor externo de captura, un futuro puerto podría expresar «obtener las mediciones de
@@ -694,9 +760,11 @@ sincrónicos y no ofrecen esa garantía: incorporar red requiere modelar resulta
 además de implementar transporte. Guardar apelación, corregir corrida y auditar tampoco es hoy
 una transacción; incluso una validación tardía del actor puede fallar después de mutar.
 
-La reproducción histórica depende de conservar las versiones: `RulebookRepository.save` permite
-reemplazar una existente, aunque el flujo normal publique una nueva. Una persistencia que exija
-versiones inviolables debe fortalecer ese contrato. Las futuras reglas deben mantener inmutable
+La reproducción histórica depende de conservar las versiones: `InMemoryRulebookRepository.save`
+reemplaza una existente y la interfaz `RulebookRepository` no prohíbe ese reemplazo, aunque el flujo
+normal publique una nueva. `InMemoryStandingsRepository.save` también permite sobrescribir cualquier
+revisión con la misma clave. Una persistencia que exija versiones/revisiones inviolables debe
+fortalecer esos contratos. Las futuras reglas deben mantener inmutable
 su configuración; `record` y copias de listas no fuerzan inmutabilidad profunda de una estrategia.
 Versionar parámetros tampoco congela el código ejecutable: cambiar el algoritmo de una clase de
 regla podría alterar resultados históricos que la usen. Una evolución durable debe conservar la
@@ -723,7 +791,7 @@ estado y motivos; no todo camino alternativo debe lanzar una excepción.
 | Registrar y evaluar | Equipo aceptado y guardado | Rechazo guardado con motivos; decisión repetida | `RegisterTeamUseCaseTest`, `EligibilityPolicyTest` |
 | Programar | Turnos normales, consecutivos y simultáneos con recursos independientes | Conflictos existentes o dentro del comando, fechas inválidas, equipo rechazado | `ScheduleRoundUseCaseTest`, `ScheduleConflictDetectorTest` |
 | Capturar | Datos válidos y último intento permitido sin reemplazar el primero | Métrica ausente, intento inválido/repetido, equipo sin turno, incidente desconocido | `CaptureRunResultUseCaseTest`, `ChallengeSpecTest` |
-| Puntuar | Fórmulas, bonos, deducciones y suma explicada | Datos ausentes con cero explicado; topes y bono no otorgado | `ScoringRulesTest`, `CalculateRunScoreUseCaseTest` |
+| Puntuar | Fórmulas, bonos, deducciones, combinación y suma explicada | Datos ausentes con cero explicado; topes y bono no otorgado | `ScoringRulesTest`, `ChallengeSpecTest`, `CalculateRunScoreUseCaseTest` |
 | Ordenar | Totales y desempates, incluido tiempo | Empate completo; métrica ausente en uno o ambos equipos | `RankingServiceTest` |
 | Publicar posiciones | Provisional a definitiva | Generación y publicación repetidas | `StandingsLifecycleTest`, `StandingsTest` |
 | Apelar | Aceptación con corrección y sin corrección | Rechazo, equipo ajeno, corrección inválida, decisión repetida/fecha inválida | `AppealRecalculationTest`, `AppealTest` |
@@ -732,11 +800,13 @@ estado y motivos; no todo camino alternativo debe lanzar una excepción.
 
 Se comprueban valores, estados y efectos observables. Algunos errores previos a persistir también
 verifican conservación del estado: corregir un incidente desconocido permite capturar el mismo
-intento; un conflicto dentro del comando no deja reservados los primeros turnos. Eso no implica
-atomicidad frente a todos los fallos posteriores.
+intento después de quitar el incidente inválido; un conflicto dentro del comando no deja reservados
+los primeros turnos. Eso no implica atomicidad frente a todos los fallos posteriores.
 
-Revisión de evolución y cobertura del 16 de septiembre de 2026: se incorporaron 25 escenarios;
-`mvn test` ejecutó **111 tests, 0 fallos, 0 errores y 0 omitidos**. No se establece una proporción
-obligatoria de tests exitosos/negativos ni se equipara cantidad con porcentaje de cobertura.
+Verificación del código actual el 18 de septiembre de 2026: `mvn clean test` recompiló los 152
+archivos Java de producción y los 22 de pruebas, y ejecutó **112 tests, 0 fallos, 0 errores y 0
+omitidos**. Es una comprobación fechada, no un total garantizado para futuras versiones.
+No se establece una proporción obligatoria de tests exitosos/negativos ni se equipara cantidad con
+porcentaje de cobertura.
 La suite no mide cobertura de líneas ni prueba todavía HTTP, proveedores, SQL, transacciones o
 concurrencia. Esas integraciones tendrán pruebas propias cuando existan.
