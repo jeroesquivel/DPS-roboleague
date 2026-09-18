@@ -44,8 +44,6 @@ public final class ResolveAppealUseCase implements ResolveAppeal {
         Appeal appeal = appeals.findById(command.appealId())
                 .orElseThrow(() -> NotFoundException.of("Appeal", command.appealId().value()));
 
-        // Todo lo que puede fallar se resuelve antes de tocar el agregado: una corrección que el
-        // desafío rechaza no puede dejar la apelación resuelta a medias.
         Optional<PendingCorrection> pending = command.accepted()
                 ? command.correction().map(correction -> validate(appeal, correction))
                 : Optional.empty();
@@ -65,7 +63,6 @@ public final class ResolveAppealUseCase implements ResolveAppeal {
         return appeal.status();
     }
 
-    /** Comprueba que la corrección es admisible para el reglamento fijado en la corrida. */
     private PendingCorrection validate(Appeal appeal, Correction correction) {
         RunResult run = runResults.findById(appeal.runId())
                 .orElseThrow(() -> NotFoundException.of("RunResult", appeal.runId().value()));

@@ -2,10 +2,6 @@ package com.dps.roboleague.domain.ranking;
 
 import com.dps.roboleague.domain.shared.DomainException;
 
-/**
- * Qué criterio resolvió un empate. Lleva el código, para ordenar o filtrar por máquina, y la
- * descripción, que es lo que se le muestra a un juez o a un equipo.
- */
 public record AppliedTiebreak(String code, String description) {
 
     public AppliedTiebreak {

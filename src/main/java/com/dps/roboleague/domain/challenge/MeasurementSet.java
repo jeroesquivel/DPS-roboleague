@@ -27,10 +27,6 @@ public record MeasurementSet(Map<MetricKey, MetricValue> values) {
         return Optional.ofNullable(values.get(key));
     }
 
-    /**
-     * El valor medido para esa métrica, si fue registrado. Es lo que consultan las reglas de
-     * puntaje: una regla nunca exige un dato, explica su ausencia.
-     */
     public Optional<BigDecimal> amountOf(MetricKey key) {
         return find(key).map(MetricValue::amount);
     }

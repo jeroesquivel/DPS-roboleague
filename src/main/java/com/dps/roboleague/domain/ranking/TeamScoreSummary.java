@@ -31,7 +31,6 @@ public record TeamScoreSummary(TeamId teamId, List<ScoredRun> runs) {
                 .reduce(Points.ZERO, Points::plus);
     }
 
-    /** El valor más bajo que el equipo registró para esa métrica, si la midió alguna vez. */
     public Optional<MetricValue> lowestMeasurement(MetricKey key) {
         return runs.stream()
                 .map(run -> run.measurements().find(key))

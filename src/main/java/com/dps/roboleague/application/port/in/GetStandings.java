@@ -12,7 +12,6 @@ public interface GetStandings {
     record Command(CompetitionId competitionId, CategoryId categoryId) {
     }
 
-    /** La revisión vigente y todas las anteriores: publicar no borra el histórico. */
     record Result(Standings latest, List<Standings> history) {
     }
 }

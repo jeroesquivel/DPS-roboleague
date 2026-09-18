@@ -13,7 +13,6 @@ public record ScoreBreakdown(List<ScoreContribution> contributions) {
         return sumOf(contributions.stream().toList());
     }
 
-    /** Lo aportado por las contribuciones de una naturaleza dada, sin saber qué regla las produjo. */
     public Points totalOf(ContributionKind kind) {
         return sumOf(contributions.stream().filter(contribution -> contribution.kind() == kind).toList());
     }

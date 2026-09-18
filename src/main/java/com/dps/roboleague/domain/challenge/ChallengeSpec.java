@@ -16,16 +16,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-/**
- * Un desafío del reglamento: sus métricas, sus reglas de puntaje y su catálogo de penalizaciones.
- * El catálogo vive acá y no dentro de la regla de penalización porque es lo que permite rechazar un
- * incidente desconocido al capturar el resultado, en lugar de descubrirlo al calcular el puntaje.
- *
- * <p>Las reglas de puntaje son una lista, no una sola regla que a su vez es un compuesto:
- * combinarlas es responsabilidad exclusiva de {@link #score}, que es su único consumidor, así que
- * envolverlas primero en un {@code ScoringRule} compuesto no evitaba ninguna duplicación real
- * (ver DESIGN.md 2.2 y 5.10).
- */
 public record ChallengeSpec(ChallengeId id, String name, List<MetricDefinition> metrics,
         List<ScoringRule> scoringRules, List<PenaltyDefinition> penalties, int maximumAttempts) {
 
@@ -58,7 +48,6 @@ public record ChallengeSpec(ChallengeId id, String name, List<MetricDefinition> 
         metrics.forEach(definition -> validateAgainst(definition, measurements));
     }
 
-    /** Un incidente que el reglamento no define se rechaza al capturar, no al puntuar. */
     public void validateIncidents(List<IncidentReport> incidents) {
         Set<PenaltyCode> defined = penalties.stream()
                 .map(PenaltyDefinition::code)

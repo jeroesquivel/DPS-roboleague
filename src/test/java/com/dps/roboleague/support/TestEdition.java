@@ -52,12 +52,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.IntStream;
 
-/**
- * Arma una edición lista para usar (temporada, competencia, reglamento) sobre los adaptadores en
- * memoria, de modo que los tests de integración sólo describan el comportamiento bajo prueba.
- *
- * <p>Todo lo que lee pasa por un caso de uso de consulta: ningún test alcanza un repositorio.
- */
 public final class TestEdition {
 
     public static final String ACTOR = "test-actor";
@@ -106,7 +100,6 @@ public final class TestEdition {
                 RescueEditionFixture.eligibilityPolicy(), RescueEditionFixture.tiebreaks(), ACTOR));
     }
 
-    // --- escritura ---
 
     public RegisterTeam.Outcome register(String name, List<Member> members, Robot robot,
             List<TeamDocument> documents) {
@@ -157,7 +150,6 @@ public final class TestEdition {
                 .with(RescueEditionFixture.ENERGY, MetricValue.of(energy));
     }
 
-    // --- consulta, siempre a través de un puerto de entrada ---
 
     public RunResult runResult(RunId runId) {
         return module.findRunResultUseCase().execute(new FindRunResult.Command(runId));

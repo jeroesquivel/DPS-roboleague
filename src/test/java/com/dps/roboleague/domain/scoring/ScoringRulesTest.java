@@ -104,11 +104,7 @@ class ScoringRulesTest {
         assertEquals(Points.ZERO, rule.breakdownFor(measured(OBJECTIVES, "4")).total());
     }
 
-    // Combinar varias reglas en un mismo puntaje es responsabilidad de ChallengeSpec, no de una
-    // ScoringRule compuesta: ver ChallengeSpecTest (scoreCombinesEveryScoringRuleWithThe...) y
-    // DESIGN.md 2.2/5.10.
 
-    // --- el contrato que toda ScoringRule respeta (LSP) ---
 
     static Stream<ScoringRule> everyRule() {
         return Stream.of(

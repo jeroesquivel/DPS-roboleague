@@ -17,11 +17,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Puntúa cada corrida capturada de una categoría con la versión de reglamento fijada en esa corrida,
- * de modo que un recálculo siempre reproduce las cifras de la edición a la que pertenece el
- * resultado. Generar y recalcular comparten este servicio para que no puedan divergir.
- */
 public final class CategoryScoringService {
 
     private final RoundRepository rounds;

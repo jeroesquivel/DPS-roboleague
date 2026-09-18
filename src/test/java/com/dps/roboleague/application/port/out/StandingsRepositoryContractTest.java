@@ -15,11 +15,6 @@ import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-/**
- * El contrato que todo adaptador de {@link StandingsRepository} debe cumplir. Cuando la entrega 2
- * agregue un adaptador con persistencia real, hereda esta clase y el contrato se verifica solo: la
- * política de revisiones es del negocio, no de la tecnología que guarda.
- */
 public abstract class StandingsRepositoryContractTest {
 
     private static final CompetitionId COMPETITION = CompetitionId.of("COMP-1");

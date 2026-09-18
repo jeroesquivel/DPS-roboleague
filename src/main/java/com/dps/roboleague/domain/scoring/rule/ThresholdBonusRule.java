@@ -26,7 +26,6 @@ public record ThresholdBonusRule(MetricKey metric, Comparison comparison, BigDec
             this.label = label;
         }
 
-        /** Texto legible para la explicación que ve un juez o un equipo. */
         public String label() {
             return label;
         }

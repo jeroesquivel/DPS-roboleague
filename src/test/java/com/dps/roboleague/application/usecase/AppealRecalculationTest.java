@@ -105,7 +105,6 @@ class AppealRecalculationTest {
     @Test
     void anAppealIsNotResolvedWhenTheCorrectionItCarriesIsRejected() {
         AppealId appealId = submitAppeal();
-        // OBJECTIVES es OBJECTIVE_COUNT: 4.5 no es un valor que el desafío acepte.
         MeasurementSet invalid = MeasurementSet.empty()
                 .with(RescueEditionFixture.TIME, MetricValue.of("95.5"))
                 .with(RescueEditionFixture.OBJECTIVES, MetricValue.of("4.5"))

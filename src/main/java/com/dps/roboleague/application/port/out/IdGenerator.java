@@ -9,10 +9,6 @@ import com.dps.roboleague.domain.shared.RunId;
 import com.dps.roboleague.domain.shared.SeasonId;
 import com.dps.roboleague.domain.shared.TeamId;
 
-/**
- * Los casos de uso piden el identificador del tipo que necesitan; el formato es un detalle que vive
- * entero en el adaptador.
- */
 public interface IdGenerator {
 
     SeasonId nextSeasonId();

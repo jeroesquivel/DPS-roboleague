@@ -63,12 +63,6 @@ import com.dps.roboleague.infrastructure.memory.InMemoryStandingsRepository;
 import com.dps.roboleague.infrastructure.memory.InMemoryTeamRegistrationRepository;
 import java.time.Clock;
 
-/**
- * El único lugar donde los casos de uso se atan a adaptadores concretos.
- *
- * <p>Sólo expone puertos de entrada: quien lo usa —el ejecutable, un futuro controller REST, los
- * tests— no puede alcanzar un repositorio ni saltearse el negocio. Leer también es un caso de uso.
- */
 public final class RoboLeagueCompositionRoot {
 
     private final SeasonRepository seasons;
@@ -111,7 +105,6 @@ public final class RoboLeagueCompositionRoot {
                 new InMemoryAppealRepository(), new InMemoryAuditLog(), new SequentialIdGenerator(), clock);
     }
 
-    // --- casos de uso de escritura ---
 
     public CreateSeason createSeasonUseCase() {
         return new CreateSeasonUseCase(seasons, idGenerator, auditLog, clock);
@@ -159,7 +152,6 @@ public final class RoboLeagueCompositionRoot {
         return new RecalculateStandingsUseCase(standings, rulebooks, scoringService, rankingService, auditLog, clock);
     }
 
-    // --- casos de uso de consulta ---
 
     public CalculateRunScore calculateRunScoreUseCase() {
         return new CalculateRunScoreUseCase(runResults, rounds, scoringService);

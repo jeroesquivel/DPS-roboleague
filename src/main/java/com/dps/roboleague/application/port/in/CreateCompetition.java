@@ -18,10 +18,6 @@ public interface CreateCompetition {
     record CategoryDraft(String name, AgeRange ageRange, RobotClass robotClass) {
     }
 
-    /**
-     * Devuelve las categorías creadas para que quien invoca no tenga que ir a buscarlas al
-     * repositorio: un adaptador de entrada sólo habla con puertos de entrada.
-     */
     record Result(CompetitionId competitionId, List<CategoryId> categoryIds) {
 
         public CategoryId firstCategory() {

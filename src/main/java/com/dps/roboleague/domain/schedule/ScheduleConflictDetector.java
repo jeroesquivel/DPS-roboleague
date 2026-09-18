@@ -4,10 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-/**
- * Detectar que una pista, un equipo o un juez ya están ocupados exige mirar turnos de varias rondas,
- * así que la regla no pertenece a ninguna entidad.
- */
 public final class ScheduleConflictDetector {
 
     public List<ScheduleConflict> detect(Collection<Heat> scheduled, Heat candidate) {

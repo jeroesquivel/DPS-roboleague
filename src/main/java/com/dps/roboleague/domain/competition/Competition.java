@@ -50,7 +50,6 @@ public final class Competition {
         return category;
     }
 
-    /** Nada de la competencia puede agendarse fuera de las fechas que la definen. */
     public void requireDateWithinPeriod(LocalDate date) {
         Objects.requireNonNull(date, "date is required");
         if (!period.contains(date)) {

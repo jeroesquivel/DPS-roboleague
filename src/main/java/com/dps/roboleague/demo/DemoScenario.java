@@ -50,10 +50,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * Recorre una edición completa a través de los casos de uso e imprime el puntaje explicable, las
- * posiciones publicadas y el efecto de una apelación aceptada. Sólo habla con puertos de entrada.
- */
 public final class DemoScenario {
 
     private static final String ORGANISER = "organiser";

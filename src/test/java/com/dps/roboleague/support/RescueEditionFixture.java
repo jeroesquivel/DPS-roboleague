@@ -31,10 +31,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
-/**
- * El reglamento sobre el que corren los tests. Es propio de los tests a propósito: el recorrido de
- * ejemplo de {@code demo} arma el suyo, así que cambiarlo no puede romper la suite.
- */
 public final class RescueEditionFixture {
 
     public static final ChallengeId CHALLENGE_ID = ChallengeId.of("RESCUE");

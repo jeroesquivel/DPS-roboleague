@@ -31,7 +31,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 
-/** El reglamento que recorre el ejecutable de ejemplo. Los tests arman el suyo. */
 final class DemoRulebook {
 
     static final ChallengeId CHALLENGE_ID = ChallengeId.of("RESCUE");
