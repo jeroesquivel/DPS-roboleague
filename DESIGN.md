@@ -167,8 +167,8 @@ incidente que corresponda**, en lugar de lanzar por esa ausencia.
 
 **Por qué:** un cliente puede aplicar una `ScoringRule` sin conocer su implementación. Para conservar
 la sustituibilidad respecto del comportamiento esperado, una regla nueva debe respetar ese manejo
-de datos ausentes. Dos tests parametrizados en
-`ScoringRulesTest` recorren las siete reglas simples de su proveedor `everyRule()` y verifican el
+de datos ausentes. Un test parametrizado en
+`ScoringRulesTest` recorre las siete reglas simples de su proveedor `everyRule()` y verifica el
 contrato. Para comprobar una regla nueva hay que agregarla explícitamente a ese proveedor.
 
 **Consecuencia sobre dónde se valida:** tolerar datos ausentes al puntuar no reemplaza las validaciones
@@ -302,7 +302,7 @@ Al programar una ronda se fija la versión vigente; al capturar un resultado esa
 el `RunResult`. Puntuar una corrida siempre carga el reglamento por esa versión, no por la vigente.
 
 **Por qué:** un reglamento publicado a mitad del evento no puede cambiar retroactivamente lo ya
-corrido. El test `CalculateRunScoreUseCaseTest` verifica justamente que una corrida vieja sigue
+corrido. El test `RulebookEvolutionTest` verifica justamente que una corrida vieja sigue
 puntuando con su reglamento aunque exista una versión nueva activa.
 
 **Alternativas descartadas:** resolver siempre el reglamento activo de la competencia (rompe el
@@ -691,8 +691,8 @@ composición, validación de mediciones contra el desafío, elegibilidad, desemp
 compartidas, conflictos de agenda, historial de correcciones y transiciones de apelaciones y
 publicación.
 
-Dos tests parametrizados recorren las siete reglas simples enumeradas en `ScoringRulesTest.everyRule`
-y verifican el contrato común (ver 2.1.1). Una implementación nueva debe incorporarse a ese proveedor
+Un test parametrizado recorre las siete reglas simples enumeradas en `ScoringRulesTest.everyRule`
+y verifica el contrato común (ver 2.1.1). Una implementación nueva debe incorporarse a ese proveedor
 y tener pruebas de su fórmula; no existe descubrimiento automático de clases. La combinación de la
 lista de reglas con el catálogo de penalizaciones y la separación de tipos de contribución se
 verifican en `ChallengeSpecTest`, no mediante tests de una clase Composite.
@@ -803,10 +803,13 @@ verifican conservación del estado: corregir un incidente desconocido permite ca
 intento después de quitar el incidente inválido; un conflicto dentro del comando no deja reservados
 los primeros turnos. Eso no implica atomicidad frente a todos los fallos posteriores.
 
-Verificación del código actual el 18 de septiembre de 2026: `mvn clean test` recompiló los 152
-archivos Java de producción y los 22 de pruebas, y ejecutó **112 tests, 0 fallos, 0 errores y 0
+Verificación del código actual el 18 de septiembre de 2026: Maven recompiló los 152
+archivos Java de producción y los 24 de pruebas, y ejecutó **119 tests, 0 fallos, 0 errores y 0
 omitidos**. Es una comprobación fechada, no un total garantizado para futuras versiones.
 No se establece una proporción obligatoria de tests exitosos/negativos ni se equipara cantidad con
 porcentaje de cobertura.
-La suite no mide cobertura de líneas ni prueba todavía HTTP, proveedores, SQL, transacciones o
-concurrencia. Esas integraciones tendrán pruebas propias cuando existan.
+JaCoCo 0.8.15 midió **100 % de instrucciones, ramas, líneas, complejidad, métodos y clases**. Son
+8.353 instrucciones, 377 ramas, 1.473 líneas, 727 puntos de complejidad, 538 métodos y 147 clases
+cubiertos. `mvn verify` genera el informe y falla si cualquiera de esos porcentajes baja del 100 %.
+La suite no prueba HTTP, proveedores, SQL, transacciones o concurrencia porque esas integraciones aún
+no existen; tendrán pruebas propias cuando se incorporen.

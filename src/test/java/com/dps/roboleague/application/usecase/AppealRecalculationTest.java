@@ -103,7 +103,6 @@ class AppealRecalculationTest {
 
     @Test
     void aNewRulebookDoesNotReplaceHistoricalScoringOrStandingsTiebreaksDuringRecalculation() {
-        // Ambos quedan en 71,50. Delta pierde 2 puntos por consumo; Omega pierde 8 entre consumo y reinicio.
         resolve(submitAppeal(), true, Optional.of(new ResolveAppeal.Correction(
                 edition.measurements("124", 5, "52"), List.of())));
         RulebookVersion newVersion = edition.module().publishRulebookUseCase()
@@ -123,7 +122,6 @@ class AppealRecalculationTest {
         assertFalse(recalculated.isFinal());
         assertEquals(Points.of("71.50"), recalculated.entryFor(delta).orElseThrow().totalPoints());
         assertEquals(Points.of("71.50"), recalculated.entryFor(omega).orElseThrow().totalPoints());
-        // El desempate nuevo por tiempo favorecería a Omega (105 s frente a 124 s).
         assertEquals(List.of(delta, omega), recalculated.entries().stream().map(StandingEntry::teamId).toList());
         assertEquals(FewestPenaltiesTiebreak.CODE,
                 recalculated.entryFor(omega).orElseThrow().appliedTiebreaks().getFirst().code());

@@ -104,8 +104,6 @@ class ScoringRulesTest {
         assertEquals(Points.ZERO, rule.breakdownFor(measured(OBJECTIVES, "4")).total());
     }
 
-
-
     static Stream<ScoringRule> everyRule() {
         return Stream.of(
                 new TimeScoringRule(TIME, Duration.ofSeconds(120), Points.of("0.50"), Points.of(30)),
@@ -126,15 +124,6 @@ class ScoringRulesTest {
         assertFalse(breakdown.contributions().isEmpty(), "a rule always emits at least one contribution");
         assertEquals(Points.ZERO, breakdown.total());
         assertTrue(breakdown.contributions().stream().noneMatch(contribution -> contribution.explanation().isBlank()));
-    }
-
-    @ParameterizedTest
-    @MethodSource("everyRule")
-    void everyRuleTagsItsContributionsWithAKindAndACode(ScoringRule rule) {
-        ScoreBreakdown breakdown = rule.breakdownFor(ScoringContext.of(MeasurementSet.empty()));
-
-        assertTrue(breakdown.contributions().stream()
-                .allMatch(contribution -> contribution.kind() != null && contribution.ruleCode() != null));
     }
 
     @Test

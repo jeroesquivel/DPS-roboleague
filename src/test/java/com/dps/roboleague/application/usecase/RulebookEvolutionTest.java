@@ -57,6 +57,7 @@ class RulebookEvolutionTest {
 
         RulebookVersion second = edition.publishRulebookWith(
                 new ObjectiveScoringRule(RescueEditionFixture.OBJECTIVES, Points.of(100), 5));
+        RunId runUnderSecondRulebook = capture(scheduleSecondRound());
         RulebookVersion third = edition.publishRulebookWith(
                 new ObjectiveScoringRule(RescueEditionFixture.OBJECTIVES, Points.of(200), 5));
 
@@ -68,6 +69,8 @@ class RulebookEvolutionTest {
         assertEquals(RulebookVersion.first(), edition.round(firstRound).rulebookVersion());
         assertEquals(RulebookVersion.first(), score(originalRun).rulebookVersion());
         assertEquals(Points.of("60.75"), score(originalRun).total());
+        assertEquals(RulebookVersion.of(2), score(runUnderSecondRulebook).rulebookVersion());
+        assertEquals(Points.of(400), score(runUnderSecondRulebook).total());
         assertEquals(originalScore.breakdown(), score(originalRun).breakdown());
         assertEquals(originalMeasurements, edition.runResult(originalRun).originalMeasurements());
         assertTrue(edition.runResult(originalRun).corrections().isEmpty());
@@ -209,7 +212,6 @@ class RulebookEvolutionTest {
         return edition.module().calculateRunScoreUseCase().execute(new CalculateRunScore.Command(runId));
     }
 
-    /** A new policy owned by the test: production only needs the ScoringRule contract to execute it. */
     private record SquaredObjectivesRule(MetricKey metric, Points multiplier) implements ScoringRule {
 
         private static final ScoringRuleCode CODE = ScoringRuleCode.of("SQUARED_OBJECTIVES");

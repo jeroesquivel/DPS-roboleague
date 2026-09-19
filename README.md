@@ -44,6 +44,14 @@ java -jar target/roboleague-1.0-SNAPSHOT.jar
 mvn test
 ```
 
+Para generar el informe de cobertura y exigir el 100 % configurado:
+
+```bash
+mvn verify
+```
+
+El informe HTML queda en `target/site/jacoco/index.html`.
+
 Para correr una sola clase de test:
 
 ```bash
